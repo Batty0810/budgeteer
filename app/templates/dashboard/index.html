@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Budgeteer{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1>Dashboard</h1>
+    <p class="mb-0">{{ current_user.household.name }}'s budget overview</p>
+  </div>
+  <div class="month-nav">
+    <a href="{{ url_for('dashboard.index', month=prev_month_str) }}" class="btn btn-outline btn-icon" aria-label="Previous month">&larr;</a>
+    <span class="current">{{ month_label }}</span>
+    <a href="{{ url_for('dashboard.index', month=next_month_str) }}" class="btn btn-outline btn-icon" aria-label="Next month">&rarr;</a>
+  </div>
+</div>
+
+<div class="grid grid-4" style="margin-bottom: 1.25rem;">
+  <div class="stat-tile">
+    <div class="stat-label">Income</div>
+    <div class="stat-value good">{{ month_income | zar }}</div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-label">Expenses</div>
+    <div class="stat-value">{{ month_expense | zar }}</div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-label">Net cash flow</div>
+    <div class="stat-value {{ 'good' if net_cash_flow >= 0 else 'bad' }}">{{ net_cash_flow | zar }}</div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-label">Irregular bill buffer</div>
+    <div class="stat-value">{{ bill_summary.saved_total | zar }}</div>
+    <div class="stat-sub">of {{ bill_summary.monthly_buffer_total | zar }}/mo needed &middot; <a href="{{ url_for('bills.list_bills') }}">view {{ bill_summary.count }} bills</a></div>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom: 1.25rem;">
+  <div class="card chart-card">
+    <div class="card-title">
+      <span>Monthly cash flow</span>
+      <span class="badge">Last 6 months</span>
+    </div>
+    <canvas id="cashFlowChart" height="220" role="img" aria-label="Bar chart of income versus expenses for the last 6 months"></canvas>
+    <button class="table-view-toggle" data-target="cashFlowTable">View as table</button>
+    <div class="table-view" id="cashFlowTable">
+      <table>
+        <thead><tr><th>Month</th><th>Income</th><th>Expenses</th></tr></thead>
+        <tbody>
+          {% for label in cash_flow.labels %}
+          <tr>
+            <td>{{ label }}</td>
+            <td class="amount income">{{ cash_flow.income[loop.index0] | zar }}</td>
+            <td class="amount">{{ cash_flow.expense[loop.index0] | zar }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card chart-card">
+    <div class="card-title">
+      <span>Where it went</span>
+      <span class="badge">{{ month_label }}</span>
+    </div>
+    {% if category_breakdown %}
+    <canvas id="categoryChart" height="220" role="img" aria-label="Donut chart of spending by category"></canvas>
+    <div class="chart-legend">
+      {% for c in category_breakdown %}
+      <span><span class="swatch" style="background: {{ c.color }}"></span>{{ c.name }} &middot; {{ c.amount | zar }}</span>
+      {% endfor %}
+    </div>
+    <button class="table-view-toggle" data-target="categoryTable">View as table</button>
+    <div class="table-view" id="categoryTable">
+      <table>
+        <thead><tr><th>Category</th><th>Spent</th></tr></thead>
+        <tbody>
+          {% for c in category_breakdown %}
+          <tr><td>{{ c.name }}</td><td class="amount">{{ c.amount | zar }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <h3>No expenses logged yet</h3>
+      <p>Log a transaction to see your spending breakdown.</p>
+      <a href="{{ url_for('transactions.new_transaction') }}" class="btn btn-primary btn-sm">Log a transaction</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-title">
+      <span>Budget remaining</span>
+      <a href="{{ url_for('transactions.list_categories') }}" class="badge">Manage budgets</a>
+    </div>
+    {% if budgets %}
+    <div class="stack" style="gap: 1rem;">
+      {% for b in budgets %}
+      <div>
+        <div class="row between" style="margin-bottom: 0.35rem;">
+          <span>{{ b.name }}</span>
+          <span class="muted">{{ b.spent | zar }} / {{ b.budget | zar }}</span>
+        </div>
+        <div class="progress {{ b.status }}"><span style="width: {{ b.percent }}%"></span></div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <h3>No budgets set</h3>
+      <p>Add a monthly budget to a category to track it here.</p>
+      <a href="{{ url_for('transactions.list_categories') }}" class="btn btn-primary btn-sm">Set up categories</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <span>Shared wishlist</span>
+      <a href="{{ url_for('wishlist.list_items') }}" class="badge">View all</a>
+    </div>
+    {% if top_wishlist_items %}
+    <div class="stack" style="gap: 1rem;">
+      {% for item in top_wishlist_items %}
+      <div>
+        <div class="row between" style="margin-bottom: 0.35rem;">
+          <span>{{ item.name }}</span>
+          <span class="muted">{{ item.saved_amount | zar }} / {{ item.estimated_cost | zar }}</span>
+        </div>
+        <div class="progress"><span style="width: {{ item.progress_percent }}%"></span></div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <h3>The wishlist is empty</h3>
+      <p>Add something the household is saving up for.</p>
+      <a href="{{ url_for('wishlist.new_item') }}" class="btn btn-primary btn-sm">Add a wish</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const cashFlowData = {{ cash_flow | tojson }};
+  const categoryData = {{ category_breakdown | tojson }};
+
+  new Chart(document.getElementById('cashFlowChart'), {
+    type: 'bar',
+    data: {
+      labels: cashFlowData.labels,
+      datasets: [
+        { label: 'Income', data: cashFlowData.income, backgroundColor: '#2ecc71' },
+        { label: 'Expenses', data: cashFlowData.expense, backgroundColor: '#ff6b6b' },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { grid: { display: false } },
+        y: { grid: { color: '#1e1e3a' }, ticks: { callback: (v) => 'R ' + v.toLocaleString() } },
+      },
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: R ${ctx.parsed.y.toLocaleString(undefined, {minimumFractionDigits: 2})}` } },
+      },
+    },
+  });
+
+  {% if category_breakdown %}
+  new Chart(document.getElementById('categoryChart'), {
+    type: 'doughnut',
+    data: {
+      labels: categoryData.map((c) => c.name),
+      datasets: [{
+        data: categoryData.map((c) => c.amount),
+        backgroundColor: categoryData.map((c) => c.color),
+        borderColor: '#12122a',
+        borderWidth: 2,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '65%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (ctx) => `${ctx.label}: R ${ctx.parsed.toLocaleString(undefined, {minimumFractionDigits: 2})}` } },
+      },
+    },
+  });
+  {% endif %}
+</script>
+{% endblock %}

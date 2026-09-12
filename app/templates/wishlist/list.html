@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% block title %}Wishlist — Budgeteer{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Shared wishlist</h1>
+    <p class="mb-0">Non-essential purchases the household is considering together. Vote it up, or chip in toward it.</p>
+  </div>
+  <a href="{{ url_for('wishlist.new_item') }}" class="btn btn-primary">+ Add a wish</a>
+</div>
+
+{% if items %}
+<div class="grid grid-2">
+  {% for item in items %}
+  {% set my_vote = item.votes | selectattr('user_id', 'equalto', current_user.id) | first %}
+  <div class="card">
+    <div class="row between" style="align-items: flex-start;">
+      <div>
+        <div class="card-title mb-0">
+          <span>{{ item.name }}</span>
+          <span class="badge {{ 'badge-success' if item.status == 'purchased' else 'badge-warning' if item.status == 'saving' else 'badge-muted' }}">{{ status_labels[item.status] }}</span>
+        </div>
+        {% if item.description %}<p>{{ item.description }}</p>{% endif %}
+        {% if item.url %}<p><a href="{{ item.url }}" target="_blank" rel="noopener">View item &rarr;</a></p>{% endif %}
+        <p class="muted mb-0">Suggested by {{ item.created_by.display_name }}</p>
+      </div>
+      <div class="vote-btns">
+        <form method="post" action="{{ url_for('wishlist.vote', item_id=item.id) }}">
+          <input type="hidden" name="value" value="up">
+          <button type="submit" class="vote-btn {{ 'active-up' if my_vote and my_vote.value == 1 else '' }}" aria-label="Upvote">&uarr;</button>
+        </form>
+        <span>{{ item.score }}</span>
+        <form method="post" action="{{ url_for('wishlist.vote', item_id=item.id) }}">
+          <input type="hidden" name="value" value="down">
+          <button type="submit" class="vote-btn {{ 'active-down' if my_vote and my_vote.value == -1 else '' }}" aria-label="Downvote">&darr;</button>
+        </form>
+      </div>
+    </div>
+
+    <div style="margin-top: 1rem;">
+      <div class="row between" style="margin-bottom: 0.35rem;">
+        <span class="muted">Saved</span>
+        <span>{{ item.saved_amount | zar }} / {{ item.estimated_cost | zar }}</span>
+      </div>
+      <div class="progress"><span style="width: {{ item.progress_percent }}%"></span></div>
+    </div>
+
+    <div class="row" style="margin-top: 1rem;">
+      <form method="post" action="{{ url_for('wishlist.contribute', item_id=item.id) }}" class="row gap-sm" style="flex: 1;">
+        {{ contribution_form.hidden_tag() }}
+        <input type="number" step="0.01" min="0.01" name="amount" placeholder="Amount (R)" style="max-width: 140px;">
+        <button type="submit" class="btn btn-outline btn-sm">Chip in</button>
+      </form>
+    </div>
+
+    <div class="row gap-sm" style="margin-top: 1rem;">
+      <a href="{{ url_for('wishlist.edit_item', item_id=item.id) }}" class="btn btn-outline btn-sm">Edit</a>
+      {% if item.status != 'purchased' %}
+      <form method="post" action="{{ url_for('wishlist.set_status', item_id=item.id) }}">
+        <input type="hidden" name="status" value="purchased">
+        <button type="submit" class="btn btn-outline btn-sm">Mark purchased</button>
+      </form>
+      {% endif %}
+      <form method="post" action="{{ url_for('wishlist.set_status', item_id=item.id) }}">
+        <input type="hidden" name="status" value="archived">
+        <button type="submit" class="btn btn-outline btn-sm">Archive</button>
+      </form>
+      <form method="post" action="{{ url_for('wishlist.delete_item', item_id=item.id) }}" data-confirm="Remove {{ item.name }} from the wishlist?">
+        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card empty-state">
+  <h3>The wishlist is empty</h3>
+  <p>Add something the household is dreaming about, and start saving toward it together.</p>
+  <a href="{{ url_for('wishlist.new_item') }}" class="btn btn-primary btn-sm">Add a wish</a>
+</div>
+{% endif %}
+{% endblock %}

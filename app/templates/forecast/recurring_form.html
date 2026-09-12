@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% block title %}{{ 'Edit recurring item' if mode == 'edit' else 'New recurring item' }} — Budgeteer{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ 'Edit recurring item' if mode == 'edit' else 'New recurring item' }}</h1>
+</div>
+
+<div class="card form-card">
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.name, placeholder="e.g. Salary, Netflix, Rent") }}
+    {{ field(form.type) }}
+    {{ field(form.category_id) }}
+    {{ field(form.amount, placeholder="0.00") }}
+    {{ field(form.frequency) }}
+    {{ field(form.start_date) }}
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">{{ 'Save changes' if mode == 'edit' else 'Add recurring item' }}</button>
+      <a href="{{ url_for('forecast.index') }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

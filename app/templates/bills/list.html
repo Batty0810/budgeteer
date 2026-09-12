@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Bill Planner — Budgeteer{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Irregular bill planner</h1>
+    <p class="mb-0">Annual subscriptions, quarterly rates, school fees — set a bit aside each month so they never surprise you.</p>
+  </div>
+  <a href="{{ url_for('bills.new_bill') }}" class="btn btn-primary">+ New bill</a>
+</div>
+
+<div class="stat-tile" style="margin-bottom: 1.25rem; max-width: 320px;">
+  <div class="stat-label">Total monthly buffer needed</div>
+  <div class="stat-value">{{ total_monthly_buffer | zar }}</div>
+</div>
+
+{% if bills %}
+<div class="grid grid-2">
+  {% for bill in bills %}
+  <div class="card">
+    <div class="card-title">
+      <span>{{ bill.name }}</span>
+      <span class="badge">{{ bill.category.name }}</span>
+    </div>
+    <p class="mb-0">Due {{ bill.due_date.strftime('%d %b %Y') }} &middot; {{ bill.months_remaining }} month(s) away</p>
+    <div class="row between" style="margin: 0.75rem 0 0.35rem;">
+      <span class="muted">Saved</span>
+      <span>{{ bill.saved_amount | zar }} / {{ bill.amount | zar }}</span>
+    </div>
+    <div class="progress {{ 'critical' if bill.progress_percent < 50 else 'warning' if bill.progress_percent < 100 else 'good' }}">
+      <span style="width: {{ bill.progress_percent }}%"></span>
+    </div>
+    <div class="row between" style="margin-top: 1rem;">
+      <span class="muted">Set aside {{ bill.monthly_buffer | zar }}/month</span>
+      <div class="row gap-sm">
+        <form method="post" action="{{ url_for('bills.add_buffer', bill_id=bill.id) }}">
+          <button type="submit" class="btn btn-outline btn-sm">+ Add this month's buffer</button>
+        </form>
+      </div>
+    </div>
+    <div class="row gap-sm" style="margin-top: 0.75rem;">
+      <a href="{{ url_for('bills.edit_bill', bill_id=bill.id) }}" class="btn btn-outline btn-sm">Edit</a>
+      <form method="post" action="{{ url_for('bills.delete_bill', bill_id=bill.id) }}" data-confirm="Remove {{ bill.name }}?">
+        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card empty-state">
+  <h3>No irregular bills yet</h3>
+  <p>Add your annual insurance, property tax, or school fees so Budgeteer can plan the buffer.</p>
+  <a href="{{ url_for('bills.new_bill') }}" class="btn btn-primary btn-sm">Add a bill</a>
+</div>
+{% endif %}
+{% endblock %}

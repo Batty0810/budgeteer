@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% block title %}{{ 'Edit wish' if mode == 'edit' else 'Add a wish' }} — Budgeteer{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ 'Edit wish' if mode == 'edit' else 'Add a wish' }}</h1>
+</div>
+
+<div class="card form-card">
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.name, placeholder="e.g. New couch") }}
+    {{ field(form.description, placeholder="Why do we want this?") }}
+    {{ field(form.url, placeholder="https://...") }}
+    {{ field(form.estimated_cost, placeholder="0.00") }}
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">{{ 'Save changes' if mode == 'edit' else 'Add to wishlist' }}</button>
+      <a href="{{ url_for('wishlist.list_items') }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

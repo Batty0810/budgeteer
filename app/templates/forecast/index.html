@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Cash Flow Forecaster — Budgeteer{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Cash flow forecaster</h1>
+    <p class="mb-0">Projected balance for {{ account.name }}, based on recurring income, bills and scheduled expenses.</p>
+  </div>
+  <div class="row gap-sm">
+    {% for m in [3, 6, 12] %}
+    <a href="{{ url_for('forecast.index', months=m) }}" class="btn btn-sm {{ 'btn-primary' if months == m else 'btn-outline' }}">{{ m }} months</a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="grid grid-3" style="margin-bottom: 1.25rem;">
+  <div class="stat-tile">
+    <div class="stat-label">Current balance</div>
+    <div class="stat-value">{{ account.starting_balance | zar }}</div>
+    <div class="stat-sub">as of {{ account.as_of_date.strftime('%d %b %Y') }} &middot; <a href="{{ url_for('forecast.edit_account') }}">update</a></div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-label">Projected in {{ months }} months</div>
+    <div class="stat-value {{ 'bad' if timeline and timeline[-1].balance < 0 else 'good' }}">{{ timeline[-1].balance | zar if timeline else (0 | zar) }}</div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-label">Lowest projected point</div>
+    <div class="stat-value {{ 'bad' if lowest_point and lowest_point.balance < 0 else '' }}">{{ lowest_point.balance | zar if lowest_point else (0 | zar) }}</div>
+    <div class="stat-sub">{{ lowest_point.date.strftime('%d %b %Y') if lowest_point else '' }}</div>
+  </div>
+</div>
+
+<div class="card chart-card" style="margin-bottom: 1.25rem;">
+  <div class="card-title"><span>Projected balance</span></div>
+  <canvas id="forecastChart" height="260" role="img" aria-label="Line chart of projected daily bank balance"></canvas>
+  <button class="table-view-toggle" data-target="forecastTable">View as table</button>
+  <div class="table-view" id="forecastTable">
+    <table>
+      <thead><tr><th>Date</th><th>Balance</th></tr></thead>
+      <tbody>
+        {% for row in monthly_checkpoints %}
+        <tr><td>{{ row.date.strftime('%d %b %Y') }}</td><td class="amount {{ 'expense' if row.balance < 0 else '' }}">{{ row.balance | zar }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">
+    <span>Recurring income &amp; expenses</span>
+    <a href="{{ url_for('forecast.new_recurring') }}" class="btn btn-primary btn-sm">+ Add recurring item</a>
+  </div>
+  {% if recurring_items %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Name</th><th>Category</th><th>Frequency</th><th>Amount</th><th></th></tr></thead>
+      <tbody>
+        {% for item in recurring_items %}
+        <tr>
+          <td>{{ item.name }}</td>
+          <td>{{ item.category.name }}</td>
+          <td>{{ item.frequency | capitalize }}</td>
+          <td class="amount {{ item.type }}">{{ '+' if item.type == 'income' else '-' }}{{ item.amount | zar }}</td>
+          <td>
+            <div class="row gap-sm" style="justify-content: flex-end;">
+              <a href="{{ url_for('forecast.edit_recurring', item_id=item.id) }}" class="btn btn-outline btn-sm">Edit</a>
+              <form method="post" action="{{ url_for('forecast.delete_recurring', item_id=item.id) }}" data-confirm="Remove {{ item.name }}?">
+                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No recurring items yet</h3>
+    <p>Add your salary, rent, and subscriptions so the forecast reflects real life.</p>
+    <a href="{{ url_for('forecast.new_recurring') }}" class="btn btn-primary btn-sm">Add recurring item</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const timeline = {{ timeline | map(attribute='date') | map('string') | list | tojson }};
+  const balances = {{ timeline | map(attribute='balance') | map('float') | list | tojson }};
+
+  new Chart(document.getElementById('forecastChart'), {
+    type: 'line',
+    data: {
+      labels: timeline,
+      datasets: [{
+        label: 'Projected balance',
+        data: balances,
+        borderColor: '#00d4ff',
+        backgroundColor: 'rgba(0, 212, 255, 0.12)',
+        fill: true,
+        segment: {
+          borderColor: (ctx) => (ctx.p0.parsed.y < 0 || ctx.p1.parsed.y < 0) ? '#ff6b6b' : '#00d4ff',
+        },
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } },
+        y: { grid: { color: '#1e1e3a' }, ticks: { callback: (v) => 'R ' + v.toLocaleString() } },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (ctx) => `Balance: R ${ctx.parsed.y.toLocaleString(undefined, {minimumFractionDigits: 2})}` } },
+      },
+    },
+  });
+</script>
+{% endblock %}

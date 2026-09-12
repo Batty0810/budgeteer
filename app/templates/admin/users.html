@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Users — Budgeteer{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Household users</h1>
+    <p class="mb-0">Create logins for the people who share this budget.</p>
+  </div>
+  <a href="{{ url_for('admin.new_user') }}" class="btn btn-primary">+ New user</a>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Status</th>
+          <th>Last login</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+        <tr>
+          <td>
+            <div class="row gap-sm">
+              <span class="avatar" style="background: {{ user.color }}; width: 26px; height: 26px; font-size: 0.65rem;">{{ user.initials }}</span>
+              {{ user.display_name }}
+            </div>
+          </td>
+          <td>{{ user.email }}</td>
+          <td><span class="badge {{ 'badge-success' if user.is_admin else 'badge-muted' }}">{{ user.role }}</span></td>
+          <td>
+            {% if user.is_active %}
+              <span class="badge badge-success">Active</span>
+            {% else %}
+              <span class="badge badge-error">Deactivated</span>
+            {% endif %}
+          </td>
+          <td class="muted">{{ user.last_login_at.strftime('%d %b %Y') if user.last_login_at else 'Never' }}</td>
+          <td>
+            <div class="row gap-sm" style="justify-content: flex-end;">
+              <a href="{{ url_for('admin.edit_user', user_id=user.id) }}" class="btn btn-outline btn-sm">Edit</a>
+              {% if user.id != current_user.id %}
+              <form method="post" action="{{ url_for('admin.toggle_active', user_id=user.id) }}">
+                <button type="submit" class="btn btn-sm {{ 'btn-danger' if user.is_active else 'btn-outline' }}">
+                  {{ 'Deactivate' if user.is_active else 'Activate' }}
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

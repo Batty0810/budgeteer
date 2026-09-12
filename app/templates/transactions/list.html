@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Transactions — Budgeteer{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1>Transactions</h1>
+    <p class="mb-0">Income and expenses logged by the household.</p>
+  </div>
+  <a href="{{ url_for('transactions.new_transaction') }}" class="btn btn-primary">+ Log transaction</a>
+</div>
+
+<div class="card" style="margin-bottom: 1.25rem;">
+  <form method="get" class="row gap-sm">
+    <input type="month" name="month" value="{{ month_str }}" onchange="this.form.submit()">
+    <select name="category_id" onchange="this.form.submit()">
+      <option value="">All categories</option>
+      {% for c in categories %}
+      <option value="{{ c.id }}" {{ 'selected' if selected_category_id == c.id else '' }}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+    <select name="tag_id" onchange="this.form.submit()">
+      <option value="">All tags</option>
+      {% for t in tags %}
+      <option value="{{ t.id }}" {{ 'selected' if selected_tag_id == t.id else '' }}>{{ t.name }}</option>
+      {% endfor %}
+    </select>
+    <noscript><button type="submit" class="btn btn-outline btn-sm">Filter</button></noscript>
+  </form>
+</div>
+
+<div class="grid grid-2" style="margin-bottom: 1.25rem;">
+  <div class="stat-tile">
+    <div class="stat-label">Income this period</div>
+    <div class="stat-value good">{{ total_income | zar }}</div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-label">Expenses this period</div>
+    <div class="stat-value">{{ total_expense | zar }}</div>
+  </div>
+</div>
+
+<div class="card">
+  {% if transactions %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Category</th>
+          <th>Description</th>
+          <th>Tags</th>
+          <th>Logged by</th>
+          <th>Amount</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in transactions %}
+        <tr>
+          <td>{{ t.date.strftime('%d %b') }}</td>
+          <td><span class="badge" style="background: {{ t.category.color }}22; color: {{ t.category.color }}; border-color: {{ t.category.color }}55;">{{ t.category.name }}</span></td>
+          <td>{{ t.description or '—' }}</td>
+          <td>
+            {% for tag in t.tags %}<span class="badge badge-muted">{{ tag.name }}</span>{% endfor %}
+          </td>
+          <td>
+            <span class="avatar" style="background: {{ t.logged_by.color }}; width: 24px; height: 24px; font-size: 0.6rem;">{{ t.logged_by.initials }}</span>
+          </td>
+          <td class="amount {{ t.type }}">{{ '+' if t.type == 'income' else '-' }}{{ t.amount | zar }}</td>
+          <td>
+            <div class="row gap-sm" style="justify-content: flex-end;">
+              <a href="{{ url_for('transactions.edit_transaction', txn_id=t.id) }}" class="btn btn-outline btn-sm">Edit</a>
+              <form method="post" action="{{ url_for('transactions.delete_transaction', txn_id=t.id) }}" data-confirm="Delete this transaction?">
+                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>Nothing logged this period</h3>
+    <p>Start tracking by logging your first transaction.</p>
+    <a href="{{ url_for('transactions.new_transaction') }}" class="btn btn-primary btn-sm">Log a transaction</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

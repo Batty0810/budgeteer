@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% block title %}{{ 'Edit user' if mode == 'edit' else 'New user' }} — Budgeteer{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ 'Edit user' if mode == 'edit' else 'New user' }}</h1>
+</div>
+
+<div class="card form-card">
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.display_name, placeholder="e.g. Alex") }}
+    {{ field(form.email, placeholder="alex@household.com") }}
+    {% if mode == 'new' %}
+      {{ field(form.password, hint="At least 8 characters. Share it with them securely - they can change it later.") }}
+    {% else %}
+      {{ field(form.new_password, hint="Leave blank to keep their current password.") }}
+    {% endif %}
+    {{ field(form.role) }}
+    {{ field(form.color, type="color", style="height: 42px; padding: 0.3rem;") }}
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">{{ 'Save changes' if mode == 'edit' else 'Create user' }}</button>
+      <a href="{{ url_for('admin.users') }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

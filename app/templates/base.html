@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Budgeteer{% endblock %}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+  {% if current_user.is_authenticated %}
+  <nav class="navbar">
+    <div class="container">
+      <a class="brand" href="{{ url_for('dashboard.index') }}">
+        <span class="brand-mark">B</span>
+        <span class="brand-text">Budgeteer<span class="dot">.</span></span>
+      </a>
+      <div class="nav-links">
+        <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if request.blueprint == 'dashboard' else '' }}">Dashboard</a>
+        <a href="{{ url_for('transactions.list_transactions') }}" class="{{ 'active' if request.blueprint == 'transactions' else '' }}">Transactions</a>
+        <a href="{{ url_for('bills.list_bills') }}" class="{{ 'active' if request.blueprint == 'bills' else '' }}">Bill Planner</a>
+        <a href="{{ url_for('forecast.index') }}" class="{{ 'active' if request.blueprint == 'forecast' else '' }}">Forecast</a>
+        <a href="{{ url_for('wishlist.list_items') }}" class="{{ 'active' if request.blueprint == 'wishlist' else '' }}">Wishlist</a>
+        {% if current_user.is_admin %}
+        <a href="{{ url_for('admin.users') }}" class="{{ 'active' if request.blueprint == 'admin' else '' }}">Admin</a>
+        {% endif %}
+      </div>
+      <div class="nav-user">
+        <span class="avatar" style="background: {{ current_user.color }}">{{ current_user.initials }}</span>
+        <a href="{{ url_for('auth.logout') }}" class="btn btn-outline btn-sm">Log out</a>
+      </div>
+    </div>
+  </nav>
+  {% endif %}
+
+  <div class="flashes" id="flashes">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+  </div>
+
+  <main class="{{ 'page' if current_user.is_authenticated else '' }}">
+    <div class="container">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

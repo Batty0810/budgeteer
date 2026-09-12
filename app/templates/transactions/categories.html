@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Categories — Budgeteer{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Categories</h1>
+    <p class="mb-0">Shared by the whole household — set a monthly budget to track it on the dashboard.</p>
+  </div>
+  <a href="{{ url_for('transactions.new_category') }}" class="btn btn-primary">+ New category</a>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Category</th><th>Type</th><th>Monthly budget</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for c in categories %}
+        <tr>
+          <td><span class="badge" style="background: {{ c.color }}22; color: {{ c.color }}; border-color: {{ c.color }}55;">{{ c.name }}</span></td>
+          <td>{{ 'Income' if c.type == 'income' else 'Expense' }}</td>
+          <td>{{ c.monthly_budget | zar if c.monthly_budget is not none else '—' }}</td>
+          <td>
+            {% if c.is_archived %}<span class="badge badge-muted">Archived</span>{% else %}<span class="badge badge-success">Active</span>{% endif %}
+          </td>
+          <td>
+            <div class="row gap-sm" style="justify-content: flex-end;">
+              <a href="{{ url_for('transactions.edit_category', category_id=c.id) }}" class="btn btn-outline btn-sm">Edit</a>
+              <form method="post" action="{{ url_for('transactions.toggle_category_archive', category_id=c.id) }}">
+                <button type="submit" class="btn btn-sm {{ 'btn-outline' if c.is_archived else 'btn-danger' }}">{{ 'Unarchive' if c.is_archived else 'Archive' }}</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% block title %}Log in — Budgeteer{% endblock %}
+{% block content %}
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+  <div class="card form-card" style="width: 100%; max-width: 380px;">
+    <div class="row" style="justify-content: center; margin-bottom: 1.5rem;">
+      <span class="brand-mark" style="width: 44px; height: 44px; font-size: 1.3rem;">B</span>
+    </div>
+    <h1 class="text-center" style="font-size: 1.5rem; margin-bottom: 0.25rem;">Budgeteer</h1>
+    <p class="text-center" style="margin-bottom: 1.75rem;">Log in to your household budget</p>
+
+    <form method="post" novalidate>
+      {{ form.hidden_tag() }}
+      {{ field(form.email, autofocus=true, placeholder="you@household.com") }}
+      {{ field(form.password, placeholder="••••••••") }}
+      <div class="row" style="margin-bottom: 1.25rem;">
+        {{ form.remember() }}
+        <label for="{{ form.remember.id }}" style="font-size: 0.85rem; color: var(--text-muted);">{{ form.remember.label.text }}</label>
+      </div>
+      <button type="submit" class="btn btn-primary w-full">Log in</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
