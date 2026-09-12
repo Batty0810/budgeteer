@@ -12,6 +12,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 RUN mkdir -p instance
 
-EXPOSE 8000
+EXPOSE 5030
 
-CMD ["gunicorn", "-b", "0.0.0.0:8000", "--workers", "2", "--timeout", "60", "run:app"]
+CMD ["gunicorn", "-b", "0.0.0.0:5030", "--workers", "2", "--timeout", "60", "run:app"]

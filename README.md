@@ -36,7 +36,7 @@ flask create-admin
 flask run
 ```
 
-Then open http://127.0.0.1:5000 and log in with the admin account you just
+Then open http://127.0.0.1:5030 and log in with the admin account you just
 created.
 
 ## Everyday use
