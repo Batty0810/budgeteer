@@ -66,6 +66,7 @@
             <div class="row gap-sm" style="justify-content: flex-end;">
               <a href="{{ url_for('forecast.edit_recurring', item_id=item.id) }}" class="btn btn-outline btn-sm">Edit</a>
               <form method="post" action="{{ url_for('forecast.delete_recurring', item_id=item.id) }}" data-confirm="Remove {{ item.name }}?">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-danger btn-sm">Delete</button>
               </form>
             </div>

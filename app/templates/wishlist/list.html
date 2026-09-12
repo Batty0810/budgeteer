@@ -27,11 +27,13 @@
       </div>
       <div class="vote-btns">
         <form method="post" action="{{ url_for('wishlist.vote', item_id=item.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="value" value="up">
           <button type="submit" class="vote-btn {{ 'active-up' if my_vote and my_vote.value == 1 else '' }}" aria-label="Upvote">&uarr;</button>
         </form>
         <span>{{ item.score }}</span>
         <form method="post" action="{{ url_for('wishlist.vote', item_id=item.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="value" value="down">
           <button type="submit" class="vote-btn {{ 'active-down' if my_vote and my_vote.value == -1 else '' }}" aria-label="Downvote">&darr;</button>
         </form>
@@ -58,15 +60,18 @@
       <a href="{{ url_for('wishlist.edit_item', item_id=item.id) }}" class="btn btn-outline btn-sm">Edit</a>
       {% if item.status != 'purchased' %}
       <form method="post" action="{{ url_for('wishlist.set_status', item_id=item.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="status" value="purchased">
         <button type="submit" class="btn btn-outline btn-sm">Mark purchased</button>
       </form>
       {% endif %}
       <form method="post" action="{{ url_for('wishlist.set_status', item_id=item.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="status" value="archived">
         <button type="submit" class="btn btn-outline btn-sm">Archive</button>
       </form>
       <form method="post" action="{{ url_for('wishlist.delete_item', item_id=item.id) }}" data-confirm="Remove {{ item.name }} from the wishlist?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-danger btn-sm">Delete</button>
       </form>
     </div>

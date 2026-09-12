@@ -100,6 +100,7 @@
             <div class="row gap-sm" style="justify-content: flex-end;">
               <a href="{{ url_for('transactions.edit_transaction', txn_id=t.id) }}" class="btn btn-outline btn-sm">Edit</a>
               <form method="post" action="{{ url_for('transactions.delete_transaction', txn_id=t.id) }}" data-confirm="Delete this transaction?">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-danger btn-sm">Delete</button>
               </form>
             </div>

@@ -20,6 +20,7 @@
   </form>
   {% if existing %}
   <form method="post" action="{{ url_for('transactions.clear_opening_balance') }}" data-confirm="Clear the manual opening balance for {{ month_start.strftime('%B %Y') }}? Budgeteer will go back to computing it automatically." style="margin-top: 0.75rem;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="month" value="{{ month_start.strftime('%Y-%m') }}">
     <button type="submit" class="btn btn-danger btn-sm">Clear override, compute automatically</button>
   </form>

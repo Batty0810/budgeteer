@@ -2,9 +2,11 @@ from datetime import date
 
 import pytest
 
+import re
+
 from app import create_app
 from app.extensions import db as _db
-from config import TestConfig
+from config import TestConfig, CSRFTestConfig
 from app.models import Household, User, Category
 from app.models.user import ROLE_ADMIN, ROLE_MEMBER
 from app.models.category import TYPE_INCOME, TYPE_EXPENSE
@@ -18,6 +20,44 @@ def app():
         yield app
         _db.session.remove()
         _db.drop_all()
+
+
+@pytest.fixture()
+def csrf_app():
+    """Like `app`, but with CSRF protection actually enabled - only
+    tests/test_csrf.py should depend on this."""
+    app = create_app(CSRFTestConfig)
+    with app.app_context():
+        _db.create_all()
+        yield app
+        _db.session.remove()
+        _db.drop_all()
+
+
+@pytest.fixture()
+def csrf_client(csrf_app):
+    return csrf_app.test_client()
+
+
+@pytest.fixture()
+def csrf_db(csrf_app):
+    return _db
+
+
+def extract_csrf_token(html):
+    match = re.search(r'name="csrf_token"[^>]*value="([^"]+)"', html) or re.search(
+        r'name="csrf_token" type="hidden" value="([^"]+)"', html
+    )
+    assert match, "No csrf_token field found in the rendered page"
+    return match.group(1)
+
+
+def login_with_csrf(client, email, password="password123"):
+    page = client.get("/auth/login")
+    token = extract_csrf_token(page.get_data(as_text=True))
+    return client.post(
+        "/auth/login", data={"email": email, "password": password, "csrf_token": token}, follow_redirects=True
+    )
 
 
 @pytest.fixture()

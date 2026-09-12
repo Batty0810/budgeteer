@@ -28,6 +28,7 @@
             <div class="row gap-sm" style="justify-content: flex-end;">
               <a href="{{ url_for('transactions.edit_category', category_id=c.id) }}" class="btn btn-outline btn-sm">Edit</a>
               <form method="post" action="{{ url_for('transactions.toggle_category_archive', category_id=c.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-sm {{ 'btn-outline' if c.is_archived else 'btn-danger' }}">{{ 'Unarchive' if c.is_archived else 'Archive' }}</button>
               </form>
             </div>

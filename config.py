@@ -38,3 +38,11 @@ class TestConfig(Config):
         "poolclass": StaticPool,
         "connect_args": {"check_same_thread": False},
     }
+
+
+class CSRFTestConfig(TestConfig):
+    """Same as TestConfig, but with CSRF protection actually turned on -
+    used by tests/test_csrf.py to catch forms that forget the token
+    (WTF_CSRF_ENABLED = False elsewhere makes that bug invisible)."""
+
+    WTF_CSRF_ENABLED = True
