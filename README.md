@@ -56,6 +56,16 @@ created.
 - **Wishlist** (`/wishlist`): propose non-essential purchases, vote on them,
   and chip in savings together.
 
+## Testing
+
+```powershell
+pip install -r requirements-dev.txt
+pytest
+```
+
+Tests use an in-memory SQLite database (`config.TestConfig`) and cover the
+forecasting math, auth/permission checks, and the main CRUD flows.
+
 ## Notes
 
 - There's no public sign-up — an admin provisions every login from the Admin
