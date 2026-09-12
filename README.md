@@ -66,6 +66,43 @@ pytest
 Tests use an in-memory SQLite database (`config.TestConfig`) and cover the
 forecasting math, auth/permission checks, and the main CRUD flows.
 
+## Deploying to Fly.io
+
+The app ships with a `Dockerfile`, `.dockerignore`, and `fly.toml` already set
+up (gunicorn as the server, a `release_command` that runs `flask db upgrade`
+on every deploy). Fly builds the image remotely, so you don't need Docker
+installed locally.
+
+```powershell
+# 1. Install flyctl (one-time) - see https://fly.io/docs/flyctl/install/
+iwr https://fly.io/install.ps1 -useb | iex
+
+# 2. Log in (opens a browser)
+fly auth login
+
+# 3. Pick a globally-unique app name and update it in fly.toml, then create the app
+#    (edit the `app = "budgeteer-household"` line first if you want a different name)
+fly apps create budgeteer-household
+
+# 4. Create a Postgres cluster and attach it - this sets the DATABASE_URL secret
+#    for you automatically
+fly postgres create --name budgeteer-db --region jnb
+fly postgres attach budgeteer-db --app budgeteer-household
+
+# 5. Set the remaining secret
+fly secrets set SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))") --app budgeteer-household
+
+# 6. Deploy
+fly deploy
+
+# 7. Create your household's first admin login against the deployed app
+fly ssh console --app budgeteer-household -C "flask create-admin --household 'Your Household' --name 'You' --email you@example.com --password 'a-strong-temp-password'"
+```
+
+After that, `fly deploy` is all you need for future updates. `fly.toml`
+targets the `jnb` (Johannesburg) region as the closest to South Africa -
+change `primary_region` if your household is elsewhere.
+
 ## Notes
 
 - There's no public sign-up — an admin provisions every login from the Admin

@@ -1,0 +1,27 @@
+# Fly.io app configuration for Budgeteer.
+# Rename `app` to a globally-unique name before your first deploy
+# (`fly apps create <name>` or edit this file, then `fly deploy`).
+app = "budgeteer-household"
+primary_region = "jnb"  # Johannesburg - closest Fly region to South Africa
+
+[build]
+
+[env]
+  FLASK_APP = "run.py"
+
+# Runs on every deploy, before traffic is routed to the new version -
+# applies any pending Alembic migrations.
+release_command = "flask db upgrade"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
