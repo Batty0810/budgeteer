@@ -24,6 +24,7 @@ class Household(db.Model):
     recurring_items = db.relationship("RecurringItem", back_populates="household", cascade="all, delete-orphan")
     irregular_bills = db.relationship("IrregularBill", back_populates="household", cascade="all, delete-orphan")
     wishlist_items = db.relationship("WishlistItem", back_populates="household", cascade="all, delete-orphan")
+    opening_balances = db.relationship("MonthlyOpeningBalance", back_populates="household", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Household {self.name!r}>"

@@ -1,14 +1,17 @@
 from datetime import date
 
+from dateutil.relativedelta import relativedelta
 from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
 
 from app.extensions import db
 from app.models.category import Category
+from app.models.opening_balance import MonthlyOpeningBalance
 from app.models.tag import Tag
 from app.models.transaction import Transaction
+from app.utils.balances import get_month_running_balances
 from app.utils.charts import next_category_color
-from app.blueprints.transactions.forms import TransactionForm, CategoryForm
+from app.blueprints.transactions.forms import TransactionForm, CategoryForm, OpeningBalanceForm
 
 bp = Blueprint("transactions", __name__, url_prefix="/transactions")
 
@@ -77,6 +80,14 @@ def list_transactions():
     total_income = sum((t.amount for t in transactions if t.type == "income"), start=0)
     total_expense = sum((t.amount for t in transactions if t.type == "expense"), start=0)
 
+    opening_balance, running_balances, closing_balance = get_month_running_balances(
+        current_user.household, start, end
+    )
+    has_override_this_month = (
+        MonthlyOpeningBalance.query.filter_by(household_id=current_user.household_id, month=start).first()
+        is not None
+    )
+
     return render_template(
         "transactions/list.html",
         transactions=transactions,
@@ -87,6 +98,11 @@ def list_transactions():
         total_expense=total_expense,
         selected_category_id=category_id,
         selected_tag_id=tag_id,
+        opening_balance=opening_balance,
+        running_balances=running_balances,
+        closing_balance=closing_balance,
+        has_override_this_month=has_override_this_month,
+        is_filtered=bool(category_id or tag_id),
     )
 
 
@@ -215,3 +231,54 @@ def toggle_category_archive(category_id):
     category.is_archived = not category.is_archived
     db.session.commit()
     return redirect(url_for("transactions.list_categories"))
+
+
+@bp.route("/opening-balance", methods=["GET", "POST"])
+@login_required
+def set_opening_balance():
+    month_str = request.args.get("month") or request.form.get("month")
+    if month_str:
+        year, month = (int(p) for p in month_str.split("-"))
+    else:
+        today = date.today()
+        year, month = today.year, today.month
+    month_start = date(year, month, 1)
+
+    existing = MonthlyOpeningBalance.query.filter_by(
+        household_id=current_user.household_id, month=month_start
+    ).first()
+
+    form = OpeningBalanceForm(obj=existing)
+    if request.method == "GET" and existing is None:
+        computed = get_month_running_balances(current_user.household, month_start, month_start + relativedelta(months=1))[0]
+        form.amount.data = computed["amount"]
+
+    if form.validate_on_submit():
+        if existing is None:
+            existing = MonthlyOpeningBalance(household_id=current_user.household_id, month=month_start)
+            db.session.add(existing)
+        existing.amount = form.amount.data
+        existing.note = form.note.data
+        db.session.commit()
+        flash(f"Set the opening balance for {month_start.strftime('%B %Y')}.", "success")
+        return redirect(url_for("transactions.list_transactions", month=month_start.strftime("%Y-%m")))
+
+    return render_template(
+        "transactions/opening_balance_form.html", form=form, month_start=month_start, existing=existing
+    )
+
+
+@bp.route("/opening-balance/clear", methods=["POST"])
+@login_required
+def clear_opening_balance():
+    month_str = request.form.get("month")
+    year, month = (int(p) for p in month_str.split("-"))
+    month_start = date(year, month, 1)
+    existing = MonthlyOpeningBalance.query.filter_by(
+        household_id=current_user.household_id, month=month_start
+    ).first()
+    if existing:
+        db.session.delete(existing)
+        db.session.commit()
+        flash(f"Cleared the manual opening balance for {month_start.strftime('%B %Y')}.", "info")
+    return redirect(url_for("transactions.list_transactions", month=month_str))

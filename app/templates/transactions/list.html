@@ -29,7 +29,15 @@
   </form>
 </div>
 
-<div class="grid grid-2" style="margin-bottom: 1.25rem;">
+<div class="grid grid-4" style="margin-bottom: 1.25rem;">
+  <div class="stat-tile">
+    <div class="stat-label">Balance brought forward</div>
+    <div class="stat-value">{{ opening_balance.amount | zar }}</div>
+    <div class="stat-sub">
+      {% if opening_balance.source == 'override' %}set manually{% elif opening_balance.source == 'account' %}from account, as of {{ opening_balance.source_date.strftime('%d %b %Y') }}{% else %}no account or override set{% endif %}
+      &middot; <a href="{{ url_for('transactions.set_opening_balance', month=month_str) }}">{{ 'edit' if has_override_this_month else 'override' }}</a>
+    </div>
+  </div>
   <div class="stat-tile">
     <div class="stat-label">Income this period</div>
     <div class="stat-value good">{{ total_income | zar }}</div>
@@ -38,10 +46,17 @@
     <div class="stat-label">Expenses this period</div>
     <div class="stat-value">{{ total_expense | zar }}</div>
   </div>
+  <div class="stat-tile">
+    <div class="stat-label">Closing balance</div>
+    <div class="stat-value {{ 'bad' if closing_balance < 0 else '' }}">{{ closing_balance | zar }}</div>
+  </div>
 </div>
 
 <div class="card">
   {% if transactions %}
+  {% if is_filtered %}
+  <p class="muted" style="margin-bottom: 1rem;">The Balance column reflects every transaction this month, not just this filtered view.</p>
+  {% endif %}
   <div class="table-wrap">
     <table>
       <thead>
@@ -52,10 +67,16 @@
           <th>Tags</th>
           <th>Logged by</th>
           <th>Amount</th>
+          <th>Balance</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
+        <tr>
+          <td colspan="6" class="muted">Balance brought forward</td>
+          <td class="amount">{{ opening_balance.amount | zar }}</td>
+          <td></td>
+        </tr>
         {% for t in transactions %}
         <tr>
           <td>{{ t.date.strftime('%d %b') }}</td>
@@ -68,6 +89,7 @@
             <span class="avatar" style="background: {{ t.logged_by.color }}; width: 24px; height: 24px; font-size: 0.6rem;">{{ t.logged_by.initials }}</span>
           </td>
           <td class="amount {{ t.type }}">{{ '+' if t.type == 'income' else '-' }}{{ t.amount | zar }}</td>
+          <td class="amount">{{ running_balances[t.id] | zar }}</td>
           <td>
             <div class="row gap-sm" style="justify-content: flex-end;">
               <a href="{{ url_for('transactions.edit_transaction', txn_id=t.id) }}" class="btn btn-outline btn-sm">Edit</a>
@@ -78,6 +100,11 @@
           </td>
         </tr>
         {% endfor %}
+        <tr>
+          <td colspan="6" class="muted">Closing balance</td>
+          <td class="amount">{{ closing_balance | zar }}</td>
+          <td></td>
+        </tr>
       </tbody>
     </table>
   </div>

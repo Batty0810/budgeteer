@@ -7,6 +7,7 @@ from app.models.account import BankAccount
 from app.models.recurring import RecurringItem
 from app.models.bill import IrregularBill
 from app.models.wishlist import WishlistItem, WishlistVote, WishlistContribution
+from app.models.opening_balance import MonthlyOpeningBalance
 
 __all__ = [
     "Household",
@@ -21,4 +22,5 @@ __all__ = [
     "WishlistItem",
     "WishlistVote",
     "WishlistContribution",
+    "MonthlyOpeningBalance",
 ]

@@ -19,3 +19,9 @@ class CategoryForm(FlaskForm):
     type = SelectField("Type", choices=[(TYPE_EXPENSE, "Expense"), (TYPE_INCOME, "Income")], validators=[DataRequired()])
     monthly_budget = DecimalField("Monthly budget (R, optional)", places=2, validators=[Optional(), NumberRange(min=0)])
     color = StringField("Colour", validators=[Optional(), Length(min=7, max=7)])
+
+
+class OpeningBalanceForm(FlaskForm):
+    # No NumberRange floor here - a real bank balance can be negative (overdraft) or zero.
+    amount = DecimalField("Balance brought forward (R)", places=2, validators=[DataRequired()])
+    note = StringField("Note", validators=[Optional(), Length(max=255)], render_kw={"placeholder": "e.g. per bank statement"})

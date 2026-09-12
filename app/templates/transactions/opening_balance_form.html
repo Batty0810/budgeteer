@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% block title %}Balance brought forward — Budgeteer{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Balance brought forward</h1>
+</div>
+
+<div class="card form-card">
+  <p>Set the confirmed opening balance for <strong>{{ month_start.strftime('%B %Y') }}</strong> - useful when it doesn't match what Budgeteer works out from your bank account and the ledger (e.g. copied straight off a bank statement).</p>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <input type="hidden" name="month" value="{{ month_start.strftime('%Y-%m') }}">
+    {{ field(form.amount, placeholder="0.00") }}
+    {{ field(form.note) }}
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Save</button>
+      <a href="{{ url_for('transactions.list_transactions', month=month_start.strftime('%Y-%m')) }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+  {% if existing %}
+  <form method="post" action="{{ url_for('transactions.clear_opening_balance') }}" data-confirm="Clear the manual opening balance for {{ month_start.strftime('%B %Y') }}? Budgeteer will go back to computing it automatically." style="margin-top: 0.75rem;">
+    <input type="hidden" name="month" value="{{ month_start.strftime('%Y-%m') }}">
+    <button type="submit" class="btn btn-danger btn-sm">Clear override, compute automatically</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

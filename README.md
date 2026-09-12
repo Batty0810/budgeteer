@@ -44,7 +44,11 @@ created.
 - **Admin page** (`/admin/users`, admins only): create logins for other
   household members, deactivate accounts, reset passwords.
 - **Transactions** (`/transactions`): log income/expenses, tag them, filter
-  by month/category/tag. Categories (with optional monthly budgets) live at
+  by month/category/tag. Each month shows a running balance - a "balance
+  brought forward" figure (computed from your bank account and the ledger,
+  or overridden manually to match a real statement at
+  `/transactions/opening-balance`), a running balance per row, and a closing
+  balance. Categories (with optional monthly budgets) live at
   `/transactions/categories`.
 - **Dashboard** (`/`): monthly cash flow chart, category breakdown, budget
   remaining, irregular bill buffer status, and a wishlist teaser.
