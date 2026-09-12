@@ -19,3 +19,22 @@ def test_new_category_gets_the_next_colour_in_sequence(client, member_user, hous
     )
     assert resp.status_code == 200
     assert b"Transport" in resp.data
+
+
+def test_categories_are_reachable_from_the_admin_page(client, admin_user):
+    login(client, admin_user.email)
+    resp = client.get("/admin/users")
+    assert resp.status_code == 200
+    assert b'href="/transactions/categories"' in resp.data
+
+    resp = client.get("/transactions/categories")
+    assert resp.status_code == 200
+    assert b'href="/admin/users"' in resp.data  # the tab back to Users is present for an admin
+
+
+def test_a_regular_member_can_still_manage_categories_without_seeing_the_admin_tabs(client, member_user, groceries_category):
+    login(client, member_user.email)
+    resp = client.get("/transactions/categories")
+    assert resp.status_code == 200
+    assert b"Groceries" in resp.data
+    assert b'href="/admin/users"' not in resp.data  # not an admin, so no dangling link to a 403
