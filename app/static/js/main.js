@@ -17,6 +17,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // Mobile nav toggle.
+  const navToggle = document.getElementById("navToggle");
+  const navLinks = document.getElementById("navLinks");
+  if (navToggle && navLinks) {
+    navToggle.addEventListener("click", () => {
+      const isOpen = navLinks.classList.toggle("open");
+      navToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    });
+  }
+
   // Toggle "view as table" disclosures next to charts.
   document.querySelectorAll(".table-view-toggle").forEach((btn) => {
     btn.addEventListener("click", () => {

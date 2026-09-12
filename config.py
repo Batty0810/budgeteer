@@ -1,6 +1,8 @@
 import os
 from datetime import timedelta
 
+from sqlalchemy.pool import StaticPool
+
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 
@@ -16,3 +18,14 @@ class Config:
     # Domain-level defaults
     CURRENCY_SYMBOL = "R"
     CURRENCY_CODE = "ZAR"
+
+
+class TestConfig(Config):
+    TESTING = True
+    WTF_CSRF_ENABLED = False
+    SECRET_KEY = "test-secret-key"
+    SQLALCHEMY_DATABASE_URI = "sqlite://"
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "poolclass": StaticPool,
+        "connect_args": {"check_same_thread": False},
+    }

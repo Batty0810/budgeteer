@@ -20,9 +20,16 @@ def _household_categories(include_archived=False):
     return query.order_by(Category.type.asc(), Category.name.asc()).all()
 
 
-def _populate_category_choices(form):
+def _populate_category_choices(form, include_category=None):
+    categories = _household_categories()
+    # A transaction's category may have been archived since it was logged -
+    # keep it selectable when editing so the form doesn't reject a value it
+    # rendered itself.
+    if include_category and include_category.is_archived and include_category not in categories:
+        categories = categories + [include_category]
     form.category_id.choices = [
-        (c.id, f"{c.name} ({'Income' if c.type == 'income' else 'Expense'})") for c in _household_categories()
+        (c.id, f"{c.name} ({'Income' if c.type == 'income' else 'Expense'})" + (" - archived" if c.is_archived else ""))
+        for c in categories
     ]
 
 
@@ -118,7 +125,7 @@ def edit_transaction(txn_id):
         abort(404)
 
     form = TransactionForm(obj=txn)
-    _populate_category_choices(form)
+    _populate_category_choices(form, include_category=txn.category)
     if request.method == "GET":
         form.tags.data = ", ".join(t.name for t in txn.tags)
 

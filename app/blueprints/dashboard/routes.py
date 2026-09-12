@@ -36,19 +36,16 @@ def index():
     household_id = current_user.household_id
 
     # --- Monthly cash flow (last N months, incl. selected month) ---
+    # Aggregated in Python (rather than a SQL date-format function) so this
+    # works unchanged on SQLite today and Postgres later.
     range_start = (month_start - relativedelta(months=MONTHS_OF_HISTORY - 1)).replace(day=1)
     rows = (
-        db.session.query(
-            func.strftime("%Y-%m", Transaction.date).label("ym"),
-            Transaction.type,
-            func.sum(Transaction.amount),
-        )
+        db.session.query(Transaction.date, Transaction.type, Transaction.amount)
         .filter(
             Transaction.household_id == household_id,
             Transaction.date >= range_start,
             Transaction.date < month_end,
         )
-        .group_by("ym", Transaction.type)
         .all()
     )
     totals_by_month = {}
@@ -59,9 +56,10 @@ def index():
         labels.append(cursor.strftime("%b %Y"))
         totals_by_month[ym] = {"income": 0.0, "expense": 0.0}
         cursor += relativedelta(months=1)
-    for ym, ttype, total in rows:
+    for txn_date, ttype, amount in rows:
+        ym = txn_date.strftime("%Y-%m")
         if ym in totals_by_month:
-            totals_by_month[ym][ttype] = float(total)
+            totals_by_month[ym][ttype] += float(amount)
 
     ordered = [totals_by_month[ym] for ym in sorted(totals_by_month)]
     cash_flow = {

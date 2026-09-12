@@ -17,7 +17,7 @@
         <span class="brand-mark">B</span>
         <span class="brand-text">Budgeteer<span class="dot">.</span></span>
       </a>
-      <div class="nav-links">
+      <div class="nav-links" id="navLinks">
         <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if request.blueprint == 'dashboard' else '' }}">Dashboard</a>
         <a href="{{ url_for('transactions.list_transactions') }}" class="{{ 'active' if request.blueprint == 'transactions' else '' }}">Transactions</a>
         <a href="{{ url_for('bills.list_bills') }}" class="{{ 'active' if request.blueprint == 'bills' else '' }}">Bill Planner</a>
@@ -26,10 +26,14 @@
         {% if current_user.is_admin %}
         <a href="{{ url_for('admin.users') }}" class="{{ 'active' if request.blueprint == 'admin' else '' }}">Admin</a>
         {% endif %}
+        <a href="{{ url_for('auth.logout') }}" class="nav-links-logout">Log out</a>
       </div>
       <div class="nav-user">
         <span class="avatar" style="background: {{ current_user.color }}">{{ current_user.initials }}</span>
-        <a href="{{ url_for('auth.logout') }}" class="btn btn-outline btn-sm">Log out</a>
+        <a href="{{ url_for('auth.logout') }}" class="btn btn-outline btn-sm nav-logout-desktop">Log out</a>
+        <button type="button" class="nav-toggle" id="navToggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="navLinks">
+          <span></span><span></span><span></span>
+        </button>
       </div>
     </div>
   </nav>

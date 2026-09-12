@@ -9,13 +9,19 @@ from app.blueprints.bills.forms import IrregularBillForm
 bp = Blueprint("bills", __name__, url_prefix="/bills")
 
 
-def _populate_category_choices(form):
+def _populate_category_choices(form, include_category=None):
     categories = (
         Category.query.filter_by(household_id=current_user.household_id, is_archived=False)
         .order_by(Category.name.asc())
         .all()
     )
-    form.category_id.choices = [(c.id, c.name) for c in categories]
+    # Keep a since-archived category selectable when editing a bill that
+    # still points at it, so the form doesn't reject its own rendered value.
+    if include_category and include_category.is_archived and include_category not in categories:
+        categories = categories + [include_category]
+    form.category_id.choices = [
+        (c.id, c.name + (" - archived" if c.is_archived else "")) for c in categories
+    ]
 
 
 @bp.route("/")
@@ -58,7 +64,7 @@ def edit_bill(bill_id):
     if bill is None or bill.household_id != current_user.household_id:
         abort(404)
     form = IrregularBillForm(obj=bill)
-    _populate_category_choices(form)
+    _populate_category_choices(form, include_category=bill.category)
     if form.validate_on_submit():
         bill.name = form.name.data.strip()
         bill.category_id = form.category_id.data
