@@ -9,6 +9,7 @@ from app.extensions import db
 from app.models.category import Category, TYPE_EXPENSE, TYPE_INCOME
 from app.models.transaction import Transaction
 from app.models.bill import IrregularBill
+from app.models.user import User
 from app.models.wishlist import WishlistItem, STATUS_ARCHIVED
 
 bp = Blueprint("dashboard", __name__, url_prefix="/")
@@ -124,6 +125,32 @@ def index():
             }
         )
 
+    # --- By household member (who brings in / spends what, combined) ---
+    member_rows = (
+        db.session.query(Transaction.user_id, Transaction.type, func.sum(Transaction.amount))
+        .filter(
+            Transaction.household_id == household_id,
+            Transaction.date >= month_start,
+            Transaction.date < month_end,
+        )
+        .group_by(Transaction.user_id, Transaction.type)
+        .all()
+    )
+    totals_by_user = {}
+    for user_id, ttype, total in member_rows:
+        totals_by_user.setdefault(user_id, {"income": 0.0, "expense": 0.0})[ttype] = float(total)
+
+    household_users = User.query.filter_by(household_id=household_id).order_by(User.display_name.asc()).all()
+    by_member = [
+        {
+            "name": u.display_name,
+            "color": u.color,
+            "income": totals_by_user.get(u.id, {}).get("income", 0.0),
+            "expense": totals_by_user.get(u.id, {}).get("expense", 0.0),
+        }
+        for u in household_users
+    ]
+
     # --- Irregular bill buffer summary ---
     active_bills = IrregularBill.query.filter_by(household_id=household_id, is_active=True).all()
     bill_summary = {
@@ -156,6 +183,7 @@ def index():
         net_cash_flow=month_income - month_expense,
         cash_flow=cash_flow,
         category_breakdown=category_breakdown,
+        by_member=by_member,
         budgets=budgets,
         bill_summary=bill_summary,
         top_wishlist_items=top_wishlist_items,

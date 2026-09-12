@@ -25,6 +25,12 @@
       <option value="{{ t.id }}" {{ 'selected' if selected_tag_id == t.id else '' }}>{{ t.name }}</option>
       {% endfor %}
     </select>
+    <select name="user_id" onchange="this.form.submit()">
+      <option value="">Logged by anyone</option>
+      {% for u in household_users %}
+      <option value="{{ u.id }}" {{ 'selected' if selected_user_id == u.id else '' }}>{{ u.display_name }}</option>
+      {% endfor %}
+    </select>
     <noscript><button type="submit" class="btn btn-outline btn-sm">Filter</button></noscript>
   </form>
 </div>

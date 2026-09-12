@@ -9,6 +9,7 @@ from app.models.category import Category
 from app.models.opening_balance import MonthlyOpeningBalance
 from app.models.tag import Tag
 from app.models.transaction import Transaction
+from app.models.user import User
 from app.utils.balances import get_month_running_balances
 from app.utils.charts import next_category_color
 from app.blueprints.transactions.forms import TransactionForm, CategoryForm, OpeningBalanceForm
@@ -76,6 +77,10 @@ def list_transactions():
     if tag_id:
         query = query.filter(Transaction.tags.any(Tag.id == tag_id))
 
+    user_id = request.args.get("user_id", type=int)
+    if user_id:
+        query = query.filter(Transaction.user_id == user_id)
+
     transactions = query.order_by(Transaction.date.desc(), Transaction.created_at.desc()).all()
     total_income = sum((t.amount for t in transactions if t.type == "income"), start=0)
     total_expense = sum((t.amount for t in transactions if t.type == "expense"), start=0)
@@ -93,16 +98,18 @@ def list_transactions():
         transactions=transactions,
         categories=_household_categories(),
         tags=Tag.query.filter_by(household_id=current_user.household_id).order_by(Tag.name).all(),
+        household_users=User.query.filter_by(household_id=current_user.household_id).order_by(User.display_name).all(),
         month_str=f"{year:04d}-{month:02d}",
         total_income=total_income,
         total_expense=total_expense,
         selected_category_id=category_id,
         selected_tag_id=tag_id,
+        selected_user_id=user_id,
         opening_balance=opening_balance,
         running_balances=running_balances,
         closing_balance=closing_balance,
         has_override_this_month=has_override_this_month,
-        is_filtered=bool(category_id or tag_id),
+        is_filtered=bool(category_id or tag_id or user_id),
     )
 
 

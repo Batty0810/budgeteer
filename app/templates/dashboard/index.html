@@ -91,6 +91,32 @@
   </div>
 </div>
 
+{% if by_member %}
+<div class="card chart-card" style="margin-bottom: 1.25rem;">
+  <div class="card-title">
+    <span>By household member</span>
+    <span class="badge">{{ month_label }}</span>
+  </div>
+  <canvas id="memberChart" height="{{ 60 + by_member|length * 40 }}" role="img" aria-label="Bar chart of income versus expenses logged by each household member"></canvas>
+  <button class="table-view-toggle" data-target="memberTable">View as table</button>
+  <div class="table-view" id="memberTable">
+    <table>
+      <thead><tr><th>Member</th><th>Income</th><th>Expenses</th><th>Net</th></tr></thead>
+      <tbody>
+        {% for m in by_member %}
+        <tr>
+          <td>{{ m.name }}</td>
+          <td class="amount income">{{ m.income | zar }}</td>
+          <td class="amount">{{ m.expense | zar }}</td>
+          <td class="amount {{ 'expense' if m.income - m.expense < 0 else '' }}">{{ (m.income - m.expense) | zar }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
 <div class="grid grid-2">
   <div class="card">
     <div class="card-title">
@@ -174,6 +200,33 @@
       },
     },
   });
+
+  {% if by_member %}
+  const memberData = {{ by_member | tojson }};
+  new Chart(document.getElementById('memberChart'), {
+    type: 'bar',
+    data: {
+      labels: memberData.map((m) => m.name),
+      datasets: [
+        { label: 'Income', data: memberData.map((m) => m.income), backgroundColor: '#2ecc71' },
+        { label: 'Expenses', data: memberData.map((m) => m.expense), backgroundColor: '#ff6b6b' },
+      ],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { grid: { color: '#1e1e3a' }, ticks: { callback: (v) => 'R ' + v.toLocaleString() } },
+        y: { grid: { display: false } },
+      },
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: R ${ctx.parsed.x.toLocaleString(undefined, {minimumFractionDigits: 2})}` } },
+      },
+    },
+  });
+  {% endif %}
 
   {% if category_breakdown %}
   new Chart(document.getElementById('categoryChart'), {
