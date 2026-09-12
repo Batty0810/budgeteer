@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Review import — Budgeteer{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Review before importing</h1>
+    <p class="mb-0">{{ statement_import.filename }} &middot; {{ statement_import.rows | length }} possible transaction(s) found. Untick or edit anything that isn't right - nothing is saved until you confirm below.</p>
+  </div>
+</div>
+
+{% if statement_import.opening_balance_guess is not none or statement_import.closing_balance_guess is not none %}
+<div class="card" style="margin-bottom: 1.25rem;">
+  <div class="row gap-sm" style="flex-wrap: wrap;">
+    {% if statement_import.opening_balance_guess is not none %}
+    <span class="badge">Opening balance found: {{ statement_import.opening_balance_guess | zar }}</span>
+    {% endif %}
+    {% if statement_import.closing_balance_guess is not none %}
+    <span class="badge">Closing balance found: {{ statement_import.closing_balance_guess | zar }}</span>
+    {% endif %}
+    {% if statement_import.statement_month_guess %}
+    <span class="badge badge-muted">Statement month: {{ statement_import.statement_month_guess.strftime('%B %Y') }}</span>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if statement_import.rows %}
+<form method="post" action="{{ url_for('imports.confirm', import_id=statement_import.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Import?</th>
+            <th>Date</th>
+            <th>Description</th>
+            <th>Type</th>
+            <th>Category</th>
+            <th>Amount (R)</th>
+            <th>Recurring?</th>
+            <th>Frequency</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in statement_import.rows %}
+          {% set prefix = 'row-' ~ row.id %}
+          <tr>
+            <td><input type="checkbox" name="{{ prefix }}-include" checked></td>
+            <td><input type="date" name="{{ prefix }}-date" value="{{ row.date.isoformat() }}" style="min-width: 145px;"></td>
+            <td>
+              <input type="text" name="{{ prefix }}-description" value="{{ row.description }}" style="min-width: 220px;">
+              {% if row.raw_line %}<div class="hint" style="margin-top: 0.25rem;" title="{{ row.raw_line }}">from: {{ row.raw_line[:60] }}{{ '…' if row.raw_line|length > 60 else '' }}</div>{% endif %}
+            </td>
+            <td>
+              <select name="{{ prefix }}-type">
+                <option value="expense" {{ 'selected' if row.type == 'expense' else '' }}>Expense</option>
+                <option value="income" {{ 'selected' if row.type == 'income' else '' }}>Income</option>
+              </select>
+            </td>
+            <td>
+              <select name="{{ prefix }}-category_id" style="min-width: 170px;">
+                <option value="">-- choose --</option>
+                {% for c in categories %}
+                <option value="{{ c.id }}" {{ 'selected' if row.category_id == c.id else '' }}>{{ c.name }} ({{ 'Income' if c.type == 'income' else 'Expense' }})</option>
+                {% endfor %}
+              </select>
+              {% if not row.category_id %}<div class="hint">no match - please pick one</div>{% endif %}
+            </td>
+            <td><input type="number" step="0.01" min="0.01" name="{{ prefix }}-amount" value="{{ row.amount }}" style="min-width: 100px;"></td>
+            <td class="text-center"><input type="checkbox" name="{{ prefix }}-is_recurring"></td>
+            <td>
+              <select name="{{ prefix }}-recurring_frequency">
+                {% for value, label in frequency_choices %}
+                <option value="{{ value }}" {{ 'selected' if value == default_frequency else '' }}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if statement_import.opening_balance_guess is not none and statement_import.statement_month_guess %}
+  <div class="card" style="margin-top: 1.25rem;">
+    <label class="row gap-sm" style="align-items: center;">
+      <input type="checkbox" name="apply_opening_balance">
+      <span>Also set {{ statement_import.statement_month_guess.strftime('%B %Y') }}'s balance brought forward to {{ statement_import.opening_balance_guess | zar }} (from this statement)</span>
+    </label>
+  </div>
+  {% endif %}
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Import selected transactions</button>
+  </div>
+</form>
+
+<form method="post" action="{{ url_for('imports.cancel', import_id=statement_import.id) }}" data-confirm="Discard this import? Nothing will be added." style="margin-top: 0.75rem;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button type="submit" class="btn btn-danger btn-sm">Discard import</button>
+</form>
+{% endif %}
+{% endblock %}

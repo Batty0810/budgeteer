@@ -60,6 +60,15 @@ created.
   months out.
 - **Wishlist** (`/wishlist`): propose non-essential purchases, vote on them,
   and chip in savings together.
+- **Import from PDF** (`/imports/upload`, linked from Transactions): upload a
+  bank statement PDF (optionally password-protected) and Budgeteer extracts
+  candidate transactions - date, description, amount, income/expense, and a
+  best-guess category. Nothing is saved until you review and edit the list
+  (fix amounts/categories, untick anything wrong, add tags) and confirm; you
+  can also flag any row as recurring (with a frequency) to seed the
+  forecaster, and optionally apply the statement's opening balance as that
+  month's "balance brought forward". Statement layouts vary a lot between
+  banks, so treat the extraction as a head start, not a guarantee.
 
 ## Testing
 

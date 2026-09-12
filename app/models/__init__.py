@@ -8,6 +8,7 @@ from app.models.recurring import RecurringItem
 from app.models.bill import IrregularBill
 from app.models.wishlist import WishlistItem, WishlistVote, WishlistContribution
 from app.models.opening_balance import MonthlyOpeningBalance
+from app.models.statement_import import StatementImport, StatementImportRow
 
 __all__ = [
     "Household",
@@ -23,4 +24,6 @@ __all__ = [
     "WishlistVote",
     "WishlistContribution",
     "MonthlyOpeningBalance",
+    "StatementImport",
+    "StatementImportRow",
 ]

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% block title %}Import a statement — Budgeteer{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Import from a bank statement</h1>
+    <p class="mb-0">Upload a PDF statement and Budgeteer will pull out the transactions it can find - you'll review and edit everything before anything is saved.</p>
+  </div>
+</div>
+
+<div class="card form-card">
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.statement, accept="application/pdf") }}
+    {{ field(form.password, placeholder="Optional", hint="Only needed if your bank protects statement PDFs with a password.") }}
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Parse statement</button>
+      <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<div class="card" style="margin-top: 1.25rem;">
+  <div class="card-title"><span>How this works</span></div>
+  <p>Bank statement layouts vary a lot, so Budgeteer's parser makes its best guess at the date, description, amount, and whether each line is income or an expense (and tries to match it to one of your existing categories). Nothing is written to your ledger yet - the next page lets you fix, remove, or add to anything before you confirm.</p>
+  <p class="mb-0">On the review page you can also flag any line as <strong>recurring</strong> (e.g. a salary deposit or a subscription debit order), which sets it up as a recurring item for the cash flow forecaster too.</p>
+</div>
+{% endblock %}

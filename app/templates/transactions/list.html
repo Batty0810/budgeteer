@@ -7,7 +7,10 @@
     <h1>Transactions</h1>
     <p class="mb-0">Income and expenses logged by the household.</p>
   </div>
-  <a href="{{ url_for('transactions.new_transaction') }}" class="btn btn-primary">+ Log transaction</a>
+  <div class="row gap-sm">
+    <a href="{{ url_for('imports.upload') }}" class="btn btn-outline">Import from PDF</a>
+    <a href="{{ url_for('transactions.new_transaction') }}" class="btn btn-primary">+ Log transaction</a>
+  </div>
 </div>
 
 <div class="card" style="margin-bottom: 1.25rem;">

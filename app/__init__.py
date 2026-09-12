@@ -35,6 +35,7 @@ def create_app(config_class=Config):
     from app.blueprints.bills.routes import bp as bills_bp
     from app.blueprints.forecast.routes import bp as forecast_bp
     from app.blueprints.wishlist.routes import bp as wishlist_bp
+    from app.blueprints.imports.routes import bp as imports_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
@@ -43,6 +44,7 @@ def create_app(config_class=Config):
     app.register_blueprint(bills_bp)
     app.register_blueprint(forecast_bp)
     app.register_blueprint(wishlist_bp)
+    app.register_blueprint(imports_bp)
 
     @app.errorhandler(403)
     def forbidden(e):

@@ -23,6 +23,7 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     PERMANENT_SESSION_LIFETIME = timedelta(days=30)
     WTF_CSRF_TIME_LIMIT = None
+    MAX_CONTENT_LENGTH = 15 * 1024 * 1024  # 15 MB - generous for a bank statement PDF
 
     # Domain-level defaults
     CURRENCY_SYMBOL = "R"
