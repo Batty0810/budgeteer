@@ -12,6 +12,7 @@
     {{ field(form.name, placeholder="e.g. Salary, Netflix, Rent") }}
     {{ field(form.type) }}
     {{ field(form.category_id) }}
+    {{ field(form.owner_id, hint="Lets the Forecaster show each person's income and expenses. Use Shared for household costs like rent.") }}
     {{ field(form.amount, placeholder="0.00") }}
     {{ field(form.frequency) }}
     {{ field(form.start_date) }}

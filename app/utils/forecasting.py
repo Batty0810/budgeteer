@@ -79,31 +79,33 @@ def project_cash_flow(household, months=3, starting_balance=None, starting_date=
     bills = bills if bills is not None else [b for b in household.irregular_bills if b.is_active]
     future_transactions = future_transactions if future_transactions is not None else []
 
-    # Pre-compute every event (date -> signed amount) across the whole window.
+    # Pre-compute every event across the whole window. Each is a dict:
+    # {"amount": signed Decimal, "label": str, "type": "income"|"expense",
+    #  "who": display name, or None for household-shared items}.
     events_by_date = {}
 
-    def add_event(d, signed_amount, label):
-        events_by_date.setdefault(d, []).append((signed_amount, label))
+    def add_event(d, ttype, amount, label, who):
+        signed = Decimal(amount) if ttype == "income" else -Decimal(amount)
+        events_by_date.setdefault(d, []).append({"amount": signed, "label": label, "type": ttype, "who": who})
 
     for item in recurring_items:
-        sign = 1 if item.type == "income" else -1
+        who = item.owner.display_name if item.owner else None
         for occ in _recurring_occurrences(item, today, horizon):
-            add_event(occ, sign * Decimal(item.amount), item.name)
+            add_event(occ, item.type, item.amount, item.name, who)
 
     for bill in bills:
         for occ in _bill_occurrences(bill, today, horizon):
-            add_event(occ, -Decimal(bill.amount), bill.name)
+            add_event(occ, "expense", bill.amount, bill.name, None)
 
     for txn in future_transactions:
         if today <= txn.date <= horizon:
-            sign = 1 if txn.type == "income" else -1
-            add_event(txn.date, sign * Decimal(txn.amount), txn.description or txn.category.name)
+            add_event(txn.date, txn.type, txn.amount, txn.description or txn.category.name, txn.logged_by.display_name)
 
     timeline = []
     cursor = today
     while cursor <= horizon:
         day_events = events_by_date.get(cursor, [])
-        day_net = sum((amt for amt, _ in day_events), Decimal("0"))
+        day_net = sum((e["amount"] for e in day_events), Decimal("0"))
         balance += day_net
         timeline.append(
             {

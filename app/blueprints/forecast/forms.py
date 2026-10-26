@@ -16,6 +16,8 @@ class RecurringItemForm(FlaskForm):
     name = StringField("Name", validators=[DataRequired(), Length(max=120)])
     type = SelectField("Type", choices=[(TYPE_EXPENSE, "Expense"), (TYPE_INCOME, "Income")], validators=[DataRequired()])
     category_id = SelectField("Category", coerce=int, validators=[DataRequired()])
+    # 0 = shared by the household; otherwise a household member's user id.
+    owner_id = SelectField("Whose is this?", coerce=int)
     amount = DecimalField("Amount (R)", places=2, validators=[DataRequired(), NumberRange(min=0.01)])
     frequency = SelectField("Frequency", choices=FREQUENCY_CHOICES, validators=[DataRequired()])
     start_date = DateField("Starts on", validators=[DataRequired()])

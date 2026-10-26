@@ -7,31 +7,67 @@
     <p class="mb-0">Projected balance for {{ account.name }}, based on recurring income, bills and scheduled expenses.</p>
   </div>
   <div class="row gap-sm">
-    {% for m in [3, 6, 12] %}
-    <a href="{{ url_for('forecast.index', months=m) }}" class="btn btn-sm {{ 'btn-primary' if months == m else 'btn-outline' }}">{{ m }} months</a>
+    {% for m in horizon_choices %}
+    <a href="{{ url_for('forecast.index', months=m, who=selected_who or None, type=selected_type or None) }}" class="btn btn-sm {{ 'btn-primary' if months == m else 'btn-outline' }}">{{ m }} month{{ 's' if m > 1 else '' }}</a>
     {% endfor %}
   </div>
 </div>
 
-<div class="grid grid-3" style="margin-bottom: 1.25rem;">
+<div class="card" style="margin-bottom: 1.25rem;">
+  <form method="get" class="row gap-sm">
+    <input type="hidden" name="months" value="{{ months }}">
+    <select name="who" onchange="this.form.submit()" aria-label="Whose items">
+      <option value="">Everyone</option>
+      {% for u in household_users %}
+      <option value="{{ u.id }}" {{ 'selected' if selected_who == u.id|string else '' }}>{{ u.display_name }}</option>
+      {% endfor %}
+      <option value="shared" {{ 'selected' if selected_who == 'shared' else '' }}>Shared (household)</option>
+    </select>
+    <select name="type" onchange="this.form.submit()" aria-label="Income or expenses">
+      <option value="">Income &amp; expenses</option>
+      <option value="income" {{ 'selected' if selected_type == 'income' else '' }}>Income only</option>
+      <option value="expense" {{ 'selected' if selected_type == 'expense' else '' }}>Expenses only</option>
+    </select>
+    <noscript><button type="submit" class="btn btn-outline btn-sm">Filter</button></noscript>
+    {% if is_filtered %}
+    <span class="muted">Showing {{ view_label }} only, as a running total from R 0 - the bank balance is shared, so it's left out of filtered views.</span>
+    {% endif %}
+  </form>
+</div>
+
+<div class="grid grid-4" style="margin-bottom: 1.25rem;">
   <div class="stat-tile">
+    {% if is_filtered %}
+    <div class="stat-label">Starting from</div>
+    <div class="stat-value">{{ 0 | zar }}</div>
+    <div class="stat-sub">{{ view_label }}</div>
+    {% else %}
     <div class="stat-label">Current balance</div>
     <div class="stat-value">{{ account.starting_balance | zar }}</div>
     <div class="stat-sub">as of {{ account.as_of_date.strftime('%d %b %Y') }} &middot; <a href="{{ url_for('forecast.edit_account') }}">update</a></div>
+    {% endif %}
   </div>
   <div class="stat-tile">
-    <div class="stat-label">Projected in {{ months }} months</div>
+    <div class="stat-label">Coming in</div>
+    <div class="stat-value good">{{ total_in | zar }}</div>
+    <div class="stat-sub">over the next {{ months }} month{{ 's' if months > 1 else '' }}</div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-label">Going out</div>
+    <div class="stat-value">{{ total_out | zar }}</div>
+    <div class="stat-sub">over the next {{ months }} month{{ 's' if months > 1 else '' }}</div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-label">{{ 'Net' if is_filtered else 'Projected' }} in {{ months }} month{{ 's' if months > 1 else '' }}</div>
     <div class="stat-value {{ 'bad' if timeline and timeline[-1].balance < 0 else 'good' }}">{{ timeline[-1].balance | zar if timeline else (0 | zar) }}</div>
-  </div>
-  <div class="stat-tile">
-    <div class="stat-label">Lowest projected point</div>
-    <div class="stat-value {{ 'bad' if lowest_point and lowest_point.balance < 0 else '' }}">{{ lowest_point.balance | zar if lowest_point else (0 | zar) }}</div>
-    <div class="stat-sub">{{ lowest_point.date.strftime('%d %b %Y') if lowest_point else '' }}</div>
+    {% if lowest_point %}
+    <div class="stat-sub {{ 'bad' if lowest_point.balance < 0 else '' }}">lowest {{ lowest_point.balance | zar }} on {{ lowest_point.date.strftime('%d %b') }}</div>
+    {% endif %}
   </div>
 </div>
 
 <div class="card chart-card" style="margin-bottom: 1.25rem;">
-  <div class="card-title"><span>Projected balance</span></div>
+  <div class="card-title"><span>{{ 'Running total' if is_filtered else 'Projected balance' }}</span></div>
   <canvas id="forecastChart" height="260" role="img" aria-label="Line chart of projected daily bank balance"></canvas>
   <button class="table-view-toggle" data-target="forecastTable">View as table</button>
   <div class="table-view" id="forecastTable">
@@ -46,6 +82,35 @@
   </div>
 </div>
 
+<div class="card" style="margin-bottom: 1.25rem;">
+  <div class="card-title">
+    <span>Upcoming</span>
+    <span class="badge">Next {{ months }} month{{ 's' if months > 1 else '' }}</span>
+  </div>
+  {% if upcoming %}
+  <div class="table-wrap">
+    <table class="ledger">
+      <thead><tr><th>Date</th><th>What</th><th>Whose</th><th class="num">Amount</th></tr></thead>
+      <tbody>
+        {% for e in upcoming %}
+        <tr>
+          <td class="nowrap">{{ e.date.strftime('%d %b %Y') }}</td>
+          <td>{{ e.label }}</td>
+          <td>{{ e.who or 'Shared' }}</td>
+          <td class="amount {{ e.type }}">{{ '+' if e.type == 'income' else '-' }}{{ e.amount | abs | zar }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>Nothing expected</h3>
+    <p>No recurring items, bills or future-dated transactions fall in this window{{ ' for this filter' if is_filtered else '' }}.</p>
+  </div>
+  {% endif %}
+</div>
+
 <div class="card">
   <div class="card-title">
     <span>Recurring income &amp; expenses</span>
@@ -53,17 +118,18 @@
   </div>
   {% if recurring_items %}
   <div class="table-wrap">
-    <table>
-      <thead><tr><th>Name</th><th>Category</th><th>Frequency</th><th>Amount</th><th></th></tr></thead>
+    <table class="ledger">
+      <thead><tr><th>Name</th><th>Category</th><th>Whose</th><th>Frequency</th><th class="num">Amount</th><th></th></tr></thead>
       <tbody>
         {% for item in recurring_items %}
         <tr>
           <td>{{ item.name }}</td>
           <td>{{ item.category.name }}</td>
+          <td>{{ item.owner.display_name if item.owner else 'Shared' }}</td>
           <td>{{ item.frequency | capitalize }}</td>
           <td class="amount {{ item.type }}">{{ '+' if item.type == 'income' else '-' }}{{ item.amount | zar }}</td>
           <td>
-            <div class="row gap-sm" style="justify-content: flex-end;">
+            <div class="row-actions">
               <a href="{{ url_for('forecast.edit_recurring', item_id=item.id) }}" class="btn btn-outline btn-sm">Edit</a>
               <form method="post" action="{{ url_for('forecast.delete_recurring', item_id=item.id) }}" data-confirm="Remove {{ item.name }}?">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -78,8 +144,8 @@
   </div>
   {% else %}
   <div class="empty-state">
-    <h3>No recurring items yet</h3>
-    <p>Add your salary, rent, and subscriptions so the forecast reflects real life.</p>
+    <h3>{{ 'Nothing recurring for this filter' if is_filtered else 'No recurring items yet' }}</h3>
+    <p>Add your salary, rent, and subscriptions so the forecast reflects real life - or tick "This repeats" when logging a transaction.</p>
     <a href="{{ url_for('forecast.new_recurring') }}" class="btn btn-primary btn-sm">Add recurring item</a>
   </div>
   {% endif %}
@@ -96,7 +162,7 @@
     data: {
       labels: timeline,
       datasets: [{
-        label: 'Projected balance',
+        label: {{ ('Running total' if is_filtered else 'Projected balance') | tojson }},
         data: balances,
         borderColor: '#00d4ff',
         backgroundColor: 'rgba(0, 212, 255, 0.12)',
@@ -116,7 +182,7 @@
       },
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: (ctx) => `Balance: R ${ctx.parsed.y.toLocaleString(undefined, {minimumFractionDigits: 2})}` } },
+        tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: R ${ctx.parsed.y.toLocaleString(undefined, {minimumFractionDigits: 2})}` } },
       },
     },
   });

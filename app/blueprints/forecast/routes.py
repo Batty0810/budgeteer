@@ -5,13 +5,18 @@ from flask_login import login_required, current_user
 
 from app.extensions import db
 from app.models.account import BankAccount
+from app.models.bill import IrregularBill
 from app.models.category import Category
 from app.models.recurring import RecurringItem
 from app.models.transaction import Transaction
+from app.models.user import User
 from app.utils.forecasting import project_cash_flow
 from app.blueprints.forecast.forms import AccountForm, RecurringItemForm
 
 bp = Blueprint("forecast", __name__, url_prefix="/forecast")
+
+HORIZON_CHOICES = (1, 3, 6, 12)
+WHO_SHARED = "shared"
 
 
 def _get_or_create_account():
@@ -21,6 +26,14 @@ def _get_or_create_account():
         db.session.add(account)
         db.session.commit()
     return account
+
+
+def _household_users():
+    return User.query.filter_by(household_id=current_user.household_id).order_by(User.display_name.asc()).all()
+
+
+def _populate_owner_choices(form):
+    form.owner_id.choices = [(0, "Shared (household)")] + [(u.id, u.display_name) for u in _household_users()]
 
 
 def _populate_category_choices(form, include_category=None):
@@ -42,23 +55,62 @@ def _populate_category_choices(form, include_category=None):
 @login_required
 def index():
     months = request.args.get("months", default=3, type=int)
-    months = months if months in (3, 6, 12) else 3
+    months = months if months in HORIZON_CHOICES else 3
+
+    # Optional filters: whose items (a user id, or "shared") and which type.
+    household_users = _household_users()
+    who = request.args.get("who", "")
+    owner = next((u for u in household_users if str(u.id) == who), None)
+    if who != WHO_SHARED and owner is None:
+        who = ""
+    txn_type = request.args.get("type", "")
+    if txn_type not in ("income", "expense"):
+        txn_type = ""
+    is_filtered = bool(who or txn_type)
 
     account = _get_or_create_account()
+    today = date.today()
+
+    recurring_items = (
+        RecurringItem.query.filter_by(household_id=current_user.household_id, is_active=True)
+        .order_by(RecurringItem.type.desc(), RecurringItem.name.asc())
+        .all()
+    )
+    bills = IrregularBill.query.filter_by(household_id=current_user.household_id, is_active=True).all()
     future_transactions = Transaction.query.filter(
         Transaction.household_id == current_user.household_id,
-        Transaction.date > date.today(),
+        Transaction.date > today,
     ).all()
 
+    if who == WHO_SHARED:
+        recurring_items = [r for r in recurring_items if r.user_id is None]
+        future_transactions = []  # every transaction was logged by someone
+    elif owner:
+        recurring_items = [r for r in recurring_items if r.user_id == owner.id]
+        future_transactions = [t for t in future_transactions if t.user_id == owner.id]
+        bills = []  # irregular bills are household-wide
+    if txn_type:
+        recurring_items = [r for r in recurring_items if r.type == txn_type]
+        future_transactions = [t for t in future_transactions if t.type == txn_type]
+        if txn_type == "income":
+            bills = []
+
+    # The bank balance belongs to the whole household, so a filtered view
+    # can't start from it - it shows a running total of just those items.
     timeline = project_cash_flow(
         household=current_user.household,
         months=months,
-        starting_balance=account.starting_balance,
-        starting_date=max(account.as_of_date, date.today()),
+        starting_balance=0 if is_filtered else account.starting_balance,
+        starting_date=max(account.as_of_date, today),
+        recurring_items=recurring_items,
+        bills=bills,
         future_transactions=future_transactions,
     )
 
     lowest_point = min(timeline, key=lambda d: d["balance"]) if timeline else None
+    upcoming = [dict(event, date=day["date"]) for day in timeline for event in day["events"]]
+    total_in = sum((e["amount"] for e in upcoming if e["amount"] > 0), 0)
+    total_out = -sum((e["amount"] for e in upcoming if e["amount"] < 0), 0)
 
     # A monthly checkpoint (balance on the 1st of each month) for the table-view
     # fallback - the daily timeline is too long to read as a table.
@@ -66,11 +118,13 @@ def index():
     if timeline and (not monthly_checkpoints or monthly_checkpoints[0]["date"] != timeline[0]["date"]):
         monthly_checkpoints.insert(0, timeline[0])
 
-    recurring_items = (
-        RecurringItem.query.filter_by(household_id=current_user.household_id, is_active=True)
-        .order_by(RecurringItem.name.asc())
-        .all()
-    )
+    if who == WHO_SHARED:
+        view_label = "Shared"
+    elif owner:
+        view_label = f"{owner.display_name}'s"
+    else:
+        view_label = "Everyone's"
+    view_label += {"income": " income", "expense": " expenses", "": " income & expenses"}[txn_type]
 
     return render_template(
         "forecast/index.html",
@@ -79,7 +133,16 @@ def index():
         lowest_point=lowest_point,
         monthly_checkpoints=monthly_checkpoints,
         months=months,
+        horizon_choices=HORIZON_CHOICES,
         recurring_items=recurring_items,
+        upcoming=upcoming,
+        total_in=total_in,
+        total_out=total_out,
+        household_users=household_users,
+        selected_who=who,
+        selected_type=txn_type,
+        is_filtered=is_filtered,
+        view_label=view_label,
     )
 
 
@@ -103,8 +166,10 @@ def edit_account():
 def new_recurring():
     form = RecurringItemForm()
     _populate_category_choices(form)
+    _populate_owner_choices(form)
     if request.method == "GET":
         form.start_date.data = date.today()
+        form.owner_id.data = current_user.id
     if form.validate_on_submit():
         item = RecurringItem(
             household_id=current_user.household_id,
@@ -114,6 +179,7 @@ def new_recurring():
             amount=form.amount.data,
             frequency=form.frequency.data,
             start_date=form.start_date.data,
+            user_id=form.owner_id.data or None,
         )
         db.session.add(item)
         db.session.commit()
@@ -130,6 +196,9 @@ def edit_recurring(item_id):
         abort(404)
     form = RecurringItemForm(obj=item)
     _populate_category_choices(form, include_category=item.category)
+    _populate_owner_choices(form)
+    if request.method == "GET":
+        form.owner_id.data = item.user_id or 0
     if form.validate_on_submit():
         item.name = form.name.data.strip()
         item.category_id = form.category_id.data
@@ -137,6 +206,7 @@ def edit_recurring(item_id):
         item.amount = form.amount.data
         item.frequency = form.frequency.data
         item.start_date = form.start_date.data
+        item.user_id = form.owner_id.data or None
         db.session.commit()
         flash(f"Updated {item.name!r}.", "success")
         return redirect(url_for("forecast.index"))

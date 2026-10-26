@@ -156,6 +156,7 @@ def confirm(import_id):
                 RecurringItem(
                     household_id=current_user.household_id,
                     category_id=category_id,
+                    user_id=current_user.id,
                     name=row_description[:120] or "Imported recurring item",
                     type=row_type,
                     amount=amount,

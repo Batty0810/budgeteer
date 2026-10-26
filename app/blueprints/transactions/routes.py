@@ -62,6 +62,7 @@ def _make_recurring(txn, frequency):
     item = RecurringItem(
         household_id=txn.household_id,
         category_id=txn.category_id,
+        user_id=txn.user_id,
         name=(txn.description or txn.category.name)[:120],
         type=txn.type,
         amount=txn.amount,
