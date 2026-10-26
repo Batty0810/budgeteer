@@ -1,7 +1,8 @@
 from datetime import date
 
 from tests.conftest import login
-from app.models import Transaction, RecurringItem
+from app.models import Transaction, RecurringItem, User
+from app.models.user import ROLE_MEMBER
 
 
 def test_logging_a_transaction_appears_in_the_list(client, member_user, groceries_category):
@@ -97,9 +98,9 @@ def test_logging_a_recurring_transaction_adds_it_to_the_forecast(client, db, mem
     txn = Transaction.query.one()
     assert txn.recurring_item_id == item.id
 
-    # Editing it shows the link rather than offering to make it recurring again.
+    # Editing it shows "This repeats" already ticked.
     html = client.get(f"/transactions/{txn.id}/edit").get_data(as_text=True)
-    assert "Repeats monthly" in html
+    assert '<input checked id="is_recurring"' in html
 
     # Removing the recurring item leaves the transaction in place, just unlinked.
     client.post(f"/forecast/recurring/{item.id}/delete")
@@ -123,3 +124,63 @@ def test_existing_transaction_can_be_made_recurring_once(client, db, household, 
     client.post(f"/transactions/{txn.id}/edit", data=edit)  # saving again doesn't add a second one
     item = RecurringItem.query.one()
     assert (item.type, item.start_date) == ("income", date(2026, 10, 25))
+
+
+def _edit(client, txn, category, **overrides):
+    data = {"type": category.type, "category_id": category.id, "user_id": txn.user_id, "amount": str(txn.amount),
+            "date": txn.date.isoformat(), "description": txn.description or "", "tags": "",
+            "is_recurring": "y", "frequency": "monthly"}
+    data.update(overrides)
+    data = {k: v for k, v in data.items() if v is not None}
+    return client.post(f"/transactions/{txn.id}/edit", data=data, follow_redirects=True)
+
+
+def test_recurring_can_be_changed_turned_off_and_back_on_from_the_transaction(client, db, member_user, groceries_category):
+    login(client, member_user.email)
+    _log(client, groceries_category, is_recurring="y", frequency="monthly")
+    txn = Transaction.query.one()
+    item = RecurringItem.query.one()
+
+    _edit(client, txn, groceries_category, frequency="annual", amount="299.00")
+    assert (item.frequency, item.amount, item.start_date) == ("annual", 299, date(2027, 9, 25))
+
+    resp = _edit(client, txn, groceries_category, is_recurring=None)
+    assert b"taken off the forecast" in resp.data
+    assert item.is_active is False
+    assert b"Microsoft 365" not in client.get("/forecast/").data
+
+    resp = _edit(client, txn, groceries_category)
+    assert b"put back on the forecast" in resp.data
+    assert item.is_active is True
+    assert RecurringItem.query.count() == 1
+
+
+def test_editing_unrelated_fields_keeps_forecaster_changes(client, db, member_user, groceries_category):
+    login(client, member_user.email)
+    _log(client, groceries_category, is_recurring="y", frequency="monthly")
+    txn = Transaction.query.one()
+    item = RecurringItem.query.one()
+    item.amount = 259  # price went up, changed on the Forecaster
+    db.session.commit()
+
+    _edit(client, txn, groceries_category, tags="software")
+    assert item.amount == 259
+
+
+def test_transaction_can_be_logged_for_another_member(client, db, household, member_user, salary_category):
+    partner = User(household_id=household.id, email="pat@example.com", display_name="Pat Partner", role=ROLE_MEMBER)
+    partner.set_password("password123")
+    db.session.add(partner)
+    db.session.commit()
+    login(client, member_user.email)
+
+    html = client.get("/transactions/new").get_data(as_text=True)
+    assert "Whose is this?" in html and "Pat Partner" in html
+
+    _log(client, salary_category, user_id=partner.id, is_recurring="y", frequency="monthly")
+    assert Transaction.query.one().user_id == partner.id
+    assert RecurringItem.query.one().user_id == partner.id
+
+    # Moving it to someone else moves the recurring item with it.
+    _edit(client, Transaction.query.one(), salary_category, user_id=member_user.id)
+    assert RecurringItem.query.one().user_id == member_user.id

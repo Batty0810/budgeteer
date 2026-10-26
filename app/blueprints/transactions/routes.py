@@ -39,6 +39,11 @@ def _populate_category_choices(form, include_category=None):
     ]
 
 
+def _populate_user_choices(form):
+    users = User.query.filter_by(household_id=current_user.household_id).order_by(User.display_name).all()
+    form.user_id.choices = [(u.id, u.display_name) for u in users]
+
+
 def _sync_tags(raw_tags):
     names = {t.strip() for t in raw_tags.split(",") if t.strip()} if raw_tags else set()
     tags = []
@@ -72,6 +77,50 @@ def _make_recurring(txn, frequency):
     db.session.add(item)
     txn.recurring_item = item
     return item
+
+
+# Transaction fields that carry over to its recurring item when edited.
+_RECURRING_SYNCED_FIELDS = {
+    "user_id": "user_id",
+    "category_id": "category_id",
+    "type": "type",
+    "amount": "amount",
+}
+
+
+def _update_recurring(txn, wants_recurring, frequency, before):
+    """Apply the form's "This repeats" choice to an edited transaction.
+
+    `before` holds the transaction's field values before this edit; only
+    fields that changed are copied onto the recurring item, so an edit made
+    on the Forecaster (e.g. a raised amount) isn't overwritten by an
+    unrelated change here (e.g. new tags). Returns a note for the flash
+    message, or "".
+    """
+    item = txn.recurring_item
+    if not wants_recurring:
+        if item is not None and item.is_active:
+            item.is_active = False
+            return " and taken off the forecast"
+        return ""
+
+    if item is None:
+        db.session.flush()  # load txn.category for the recurring item's name
+        _make_recurring(txn, frequency)
+        return " and added to the forecast as recurring"
+
+    reactivated = not item.is_active
+    if reactivated or item.frequency != frequency or before["date"] != txn.date:
+        item.start_date = txn.date + frequency_step(frequency)
+    item.is_active = True
+    item.frequency = frequency
+    for txn_field, item_field in _RECURRING_SYNCED_FIELDS.items():
+        if before[txn_field] != getattr(txn, txn_field):
+            setattr(item, item_field, getattr(txn, txn_field))
+    if before["description"] != txn.description:
+        db.session.flush()
+        item.name = (txn.description or txn.category.name)[:120]
+    return " and put back on the forecast" if reactivated else ""
 
 
 def _ledger_url_for(day):
@@ -151,13 +200,16 @@ def list_transactions():
 def new_transaction():
     form = TransactionForm()
     _populate_category_choices(form)
+    _populate_user_choices(form)
+    # Default to whoever is logging it (also covers a POST without the field).
+    form.user_id.data = form.user_id.data or current_user.id
     if request.method == "GET":
         form.date.data = date.today()
 
     if form.validate_on_submit():
         txn = Transaction(
             household_id=current_user.household_id,
-            user_id=current_user.id,
+            user_id=form.user_id.data,
             category_id=form.category_id.data,
             type=form.type.data,
             amount=form.amount.data,
@@ -185,22 +237,26 @@ def edit_transaction(txn_id):
 
     form = TransactionForm(obj=txn)
     _populate_category_choices(form, include_category=txn.category)
+    _populate_user_choices(form)
     if request.method == "GET":
         form.tags.data = ", ".join(t.name for t in txn.tags)
+        item = txn.recurring_item
+        form.is_recurring.data = bool(item and item.is_active)
+        if item:
+            form.frequency.data = item.frequency
 
     if form.validate_on_submit():
+        before = {f: getattr(txn, f) for f in ("user_id", "category_id", "type", "amount", "description", "date")}
+        txn.user_id = form.user_id.data
         txn.category_id = form.category_id.data
         txn.type = form.type.data
         txn.amount = form.amount.data
         txn.description = form.description.data
         txn.date = form.date.data
         txn.tags = _sync_tags(form.tags.data)
-        made_recurring = form.is_recurring.data and txn.recurring_item is None
-        if made_recurring:
-            db.session.flush()
-            _make_recurring(txn, form.frequency.data)
+        note = _update_recurring(txn, form.is_recurring.data, form.frequency.data, before)
         db.session.commit()
-        flash("Transaction updated" + (" and added to the forecast as recurring." if made_recurring else "."), "success")
+        flash(f"Transaction updated{note}.", "success")
         return redirect(_ledger_url_for(txn.date))
 
     return render_template("transactions/form.html", form=form, mode="edit", txn=txn)

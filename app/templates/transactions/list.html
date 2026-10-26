@@ -40,7 +40,7 @@
       {% endfor %}
     </select>
     <select name="user_id" onchange="this.form.submit()">
-      <option value="">Logged by anyone</option>
+      <option value="">Everyone</option>
       {% for u in household_users %}
       <option value="{{ u.id }}" {{ 'selected' if selected_user_id == u.id else '' }}>{{ u.display_name }}</option>
       {% endfor %}
@@ -85,7 +85,7 @@
           <th>Category</th>
           <th>Description</th>
           <th>Tags</th>
-          <th>Logged by</th>
+          <th>Whose</th>
           <th class="num">Amount</th>
           <th class="num">Balance</th>
           <th></th>
@@ -106,7 +106,7 @@
             {% for tag in t.tags %}<span class="badge badge-muted">{{ tag.name }}</span>{% endfor %}
           </td>
           <td>
-            <span class="avatar" style="background: {{ t.logged_by.color }}; width: 24px; height: 24px; font-size: 0.6rem;">{{ t.logged_by.initials }}</span>
+            <span class="avatar" title="{{ t.logged_by.display_name }}" style="background: {{ t.logged_by.color }}; width: 24px; height: 24px; font-size: 0.6rem;">{{ t.logged_by.initials }}</span>
           </td>
           <td class="amount {{ t.type }}">{{ '+' if t.type == 'income' else '-' }}{{ t.amount | zar }}</td>
           <td class="amount">{{ running_balances[t.id] | zar }}</td>

@@ -9,6 +9,7 @@ from app.models.recurring import FREQUENCY_CHOICES, FREQ_MONTHLY
 class TransactionForm(FlaskForm):
     type = SelectField("Type", choices=[(TYPE_EXPENSE, "Expense"), (TYPE_INCOME, "Income")], validators=[DataRequired()])
     category_id = SelectField("Category", coerce=int, validators=[DataRequired()])
+    user_id = SelectField("Whose is this?", coerce=int, validators=[DataRequired()])
     amount = DecimalField("Amount (R)", places=2, validators=[DataRequired(), NumberRange(min=0.01)])
     date = DateField("Date", validators=[DataRequired()])
     description = StringField("Description", validators=[Optional(), Length(max=255)])
