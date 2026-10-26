@@ -7,21 +7,35 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 
 def _normalize_db_url(url):
-    """Fly/Heroku-style Postgres URLs use the 'postgres://' scheme, which
-    SQLAlchemy 2.x rejects, and don't specify a driver. Rewrite to the
-    psycopg3 driver URL SQLAlchemy expects; leave everything else as-is."""
-    if url and url.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql+psycopg://", 1)
+    """Hosted Postgres URLs (Neon, Heroku, ...) use 'postgres://' or a bare
+    'postgresql://' scheme. SQLAlchemy 2.x rejects the former and maps the
+    latter to psycopg2, which isn't installed. Rewrite both to the psycopg3
+    driver URL; leave everything else (e.g. sqlite) as-is."""
+    if url:
+        for scheme in ("postgres://", "postgresql://"):
+            if url.startswith(scheme):
+                return url.replace(scheme, "postgresql+psycopg://", 1)
     return url
+
+
+_DATABASE_URL = _normalize_db_url(
+    os.environ.get("DATABASE_URL", f"sqlite:///{os.path.join(basedir, 'instance', 'budgeteer.db')}")
+)
 
 
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
-    SQLALCHEMY_DATABASE_URI = _normalize_db_url(
-        os.environ.get("DATABASE_URL", f"sqlite:///{os.path.join(basedir, 'instance', 'budgeteer.db')}")
+    SQLALCHEMY_DATABASE_URI = _DATABASE_URL
+    # Neon suspends idle databases and drops their connections; check each
+    # pooled connection before use and recycle them well inside that window.
+    SQLALCHEMY_ENGINE_OPTIONS = (
+        {"pool_pre_ping": True, "pool_recycle": 280} if _DATABASE_URL.startswith("postgresql") else {}
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     PERMANENT_SESSION_LIFETIME = timedelta(days=30)
+    # Render serves the app over HTTPS only (it sets RENDER=true); keep
+    # login cookies off plain HTTP there, but not in local dev.
+    SESSION_COOKIE_SECURE = REMEMBER_COOKIE_SECURE = bool(os.environ.get("RENDER"))
     WTF_CSRF_TIME_LIMIT = None
     MAX_CONTENT_LENGTH = 15 * 1024 * 1024  # 15 MB - generous for a bank statement PDF
 

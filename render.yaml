@@ -1,0 +1,24 @@
+# Render Blueprint for Budgeteer - a single free web service. The database
+# lives on Neon's free Postgres (see "Deploying" in README.md).
+services:
+  - type: web
+    name: budgeteer
+    runtime: python
+    plan: free
+    region: frankfurt  # closest Render region to South Africa; can't be changed later
+    buildCommand: pip install -r requirements.txt
+    # Apply any pending migrations, then serve. Done here rather than in a
+    # pre-deploy command so it works on the free plan.
+    startCommand: flask db upgrade && gunicorn -b 0.0.0.0:$PORT --workers 2 --timeout 60 run:app
+    healthCheckPath: /healthz
+    # Deploy each push to main, but only once the GitHub Actions tests pass.
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: FLASK_APP
+        value: run.py
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false  # paste the Neon connection string when creating the Blueprint

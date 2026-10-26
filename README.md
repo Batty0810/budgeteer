@@ -7,7 +7,7 @@ South African Rand (R).
 
 ## Stack
 
-Flask + SQLAlchemy + SQLite, server-rendered with Jinja2, Chart.js (via CDN)
+Flask + SQLAlchemy (SQLite locally, Postgres when deployed), server-rendered with Jinja2, Chart.js (via CDN)
 for charts. No Node.js/npm required to run it.
 
 ## Setup
@@ -80,42 +80,56 @@ pytest
 Tests use an in-memory SQLite database (`config.TestConfig`) and cover the
 forecasting math, auth/permission checks, and the main CRUD flows.
 
-## Deploying to Fly.io
+## Deploying (free: GitHub + Render + Neon)
 
-The app ships with a `Dockerfile`, `.dockerignore`, and `fly.toml` already set
-up (gunicorn as the server, a `release_command` that runs `flask db upgrade`
-on every deploy). Fly builds the image remotely, so you don't need Docker
-installed locally.
+The live site runs entirely on free tiers, straight from this GitHub repo:
+
+- **GitHub** holds the code and runs the tests on every push
+  (`.github/workflows/tests.yml`).
+- **Render** (free web service) runs the app. `render.yaml` describes it, and
+  every push to `main` redeploys automatically once the tests pass.
+  Migrations (`flask db upgrade`) run each time the app starts.
+- **Neon** (free Postgres) holds the data. Unlike Render's own free database,
+  it doesn't expire.
+
+The one trade-off: Render's free tier puts the app to sleep after 15 minutes
+of no visits, so the first visit after a quiet spell takes up to about a
+minute to load. After that it's normal speed.
+
+### One-time setup
+
+**1. Create the database on Neon.** Sign up at https://neon.tech (logging in
+with GitHub is fine), create a project, and pick the **AWS Europe Central
+(Frankfurt)** region so it sits next to the app. On the project dashboard,
+click **Connect**, turn **Connection pooling** off, and copy the connection
+string (`postgresql://...neon.tech/neondb?sslmode=require...`).
+
+**2. Create your admin login.** Render's free tier has no remote shell, so
+run this once from your own machine, pointing at the Neon database:
 
 ```powershell
-# 1. Install flyctl (one-time) - see https://fly.io/docs/flyctl/install/
-iwr https://fly.io/install.ps1 -useb | iex
-
-# 2. Log in (opens a browser)
-fly auth login
-
-# 3. Pick a globally-unique app name and update it in fly.toml, then create the app
-#    (edit the `app = "budgeteer-household"` line first if you want a different name)
-fly apps create budgeteer-household
-
-# 4. Create a Postgres cluster and attach it - this sets the DATABASE_URL secret
-#    for you automatically
-fly postgres create --name budgeteer-db --region jnb
-fly postgres attach budgeteer-db --app budgeteer-household
-
-# 5. Set the remaining secret
-fly secrets set SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))") --app budgeteer-household
-
-# 6. Deploy
-fly deploy
-
-# 7. Create your household's first admin login against the deployed app
-fly ssh console --app budgeteer-household -C "flask create-admin --household 'Your Household' --name 'You' --email you@example.com --password 'a-strong-temp-password'"
+.venv\Scripts\Activate.ps1
+$env:DATABASE_URL = "postgresql://...paste the Neon string..."
+flask db upgrade
+flask create-admin
+Remove-Item Env:DATABASE_URL   # back to your local SQLite database
 ```
 
-After that, `fly deploy` is all you need for future updates. `fly.toml`
-targets the `jnb` (Johannesburg) region as the closest to South Africa -
-change `primary_region` if your household is elsewhere.
+**3. Create the app on Render.** Sign up at https://render.com with GitHub,
+then **New -> Blueprint**, pick this repository, and paste the same Neon
+connection string when it asks for `DATABASE_URL`. `SECRET_KEY` is generated
+for you. Click **Apply**. The first deploy takes a few minutes, and then the
+app is live at `https://budgeteer-<something>.onrender.com`. Log in with the
+admin account from step 2, and add the other household members from the
+Admin page.
+
+Tip: on a phone, open the site and choose "Add to Home Screen" for
+one-tap access.
+
+### Updating
+
+Push to `main`. GitHub runs the tests, and Render deploys when they pass.
+You can follow progress in the repo's Actions tab and on the Render dashboard.
 
 ## Notes
 
@@ -123,4 +137,5 @@ change `primary_region` if your household is elsewhere.
   page. The very first admin/household is created with `flask create-admin`.
 - All data is scoped to a single household per login; everyone in the
   household sees and edits the same budget ("shared partner sync").
-- The SQLite database lives at `instance/budgeteer.db` and is gitignored.
+- Locally, the SQLite database lives at `instance/budgeteer.db` and is
+  gitignored. The deployed site uses Neon Postgres via `DATABASE_URL`.

@@ -54,6 +54,12 @@ def create_app(config_class=Config):
     def not_found(e):
         return render_template("errors/404.html"), 404
 
+    @app.get("/healthz")
+    def healthz():
+        # Used by Render's health check; deliberately doesn't touch the
+        # database so pinging it never wakes a suspended Neon instance.
+        return "ok"
+
     @app.context_processor
     def inject_globals():
         return {"currency_symbol": app.config.get("CURRENCY_SYMBOL", "R")}
