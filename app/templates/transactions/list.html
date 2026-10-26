@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import period_picker %}
 {% block title %}Transactions — Budgeteer{% endblock %}
 {% block content %}
 
@@ -13,9 +14,14 @@
   </div>
 </div>
 
+<div class="row" style="justify-content: flex-end; margin-bottom: 1rem;">
+  {{ period_picker(period, nav) }}
+</div>
+
 <div class="card" style="margin-bottom: 1.25rem;">
   <form method="get" class="row gap-sm">
-    <input type="month" name="month" value="{{ month_str }}" onchange="this.form.submit()">
+    <input type="hidden" name="start" value="{{ period.start.isoformat() }}">
+    <input type="hidden" name="end" value="{{ period.end.isoformat() }}">
     <select name="category_id" onchange="this.form.submit()">
       <option value="">All categories</option>
       {% for c in categories %}
@@ -44,7 +50,7 @@
     <div class="stat-value">{{ opening_balance.amount | zar }}</div>
     <div class="stat-sub">
       {% if opening_balance.source == 'override' %}set manually{% elif opening_balance.source == 'account' %}from account, as of {{ opening_balance.source_date.strftime('%d %b %Y') }}{% else %}no account or override set{% endif %}
-      &middot; <a href="{{ url_for('transactions.set_opening_balance', month=month_str) }}">{{ 'edit' if has_override_this_month else 'override' }}</a>
+      &middot; <a href="{{ url_for('transactions.set_opening_balance', **period.query_args()) }}">{{ 'edit' if has_override_this_period else 'override' }}</a>
     </div>
   </div>
   <div class="stat-tile">
@@ -64,7 +70,7 @@
 <div class="card">
   {% if transactions %}
   {% if is_filtered %}
-  <p class="muted" style="margin-bottom: 1rem;">The Balance column reflects every transaction this month, not just this filtered view.</p>
+  <p class="muted" style="margin-bottom: 1rem;">The Balance column reflects every transaction in this period, not just this filtered view.</p>
   {% endif %}
   <div class="table-wrap">
     <table>

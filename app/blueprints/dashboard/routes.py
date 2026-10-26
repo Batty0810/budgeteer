@@ -1,6 +1,3 @@
-from datetime import date
-
-from dateutil.relativedelta import relativedelta
 from flask import Blueprint, render_template, request
 from flask_login import login_required, current_user
 from sqlalchemy import func
@@ -11,62 +8,50 @@ from app.models.transaction import Transaction
 from app.models.bill import IrregularBill
 from app.models.user import User
 from app.models.wishlist import WishlistItem, STATUS_ARCHIVED
+from app.utils.periods import resolve_period, recent_cycles, period_nav
 
 bp = Blueprint("dashboard", __name__, url_prefix="/")
 
-MONTHS_OF_HISTORY = 6
-
-
-def _month_bounds(year, month):
-    start = date(year, month, 1)
-    end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
-    return start, end
+PERIODS_OF_HISTORY = 6
 
 
 @bp.route("/")
 @login_required
 def index():
-    today = date.today()
-    month_str = request.args.get("month", today.strftime("%Y-%m"))
-    try:
-        year, month = (int(p) for p in month_str.split("-"))
-    except ValueError:
-        year, month = today.year, today.month
-    month_start, month_end = _month_bounds(year, month)
-
     household_id = current_user.household_id
+    period = resolve_period(request.args, current_user.household.period_start_day)
+    period_start, period_end = period.start, period.end_exclusive
 
-    # --- Monthly cash flow (last N months, incl. selected month) ---
+    # --- Cash flow per budget period (last N, ending with the selected one) ---
     # Aggregated in Python (rather than a SQL date-format function) so this
-    # works unchanged on SQLite today and Postgres later.
-    range_start = (month_start - relativedelta(months=MONTHS_OF_HISTORY - 1)).replace(day=1)
+    # works unchanged on SQLite and Postgres.
+    cycles = recent_cycles(period, PERIODS_OF_HISTORY)
     rows = (
         db.session.query(Transaction.date, Transaction.type, Transaction.amount)
         .filter(
             Transaction.household_id == household_id,
-            Transaction.date >= range_start,
-            Transaction.date < month_end,
+            Transaction.date >= min(cycles[0].start, period_start),
+            Transaction.date < max(cycles[-1].end_exclusive, period_end),
         )
         .all()
     )
-    totals_by_month = {}
-    labels = []
-    cursor = range_start
-    for _ in range(MONTHS_OF_HISTORY):
-        ym = cursor.strftime("%Y-%m")
-        labels.append(cursor.strftime("%b %Y"))
-        totals_by_month[ym] = {"income": 0.0, "expense": 0.0}
-        cursor += relativedelta(months=1)
+    cycle_totals = [{"income": 0.0, "expense": 0.0} for _ in cycles]
+    month_income = month_expense = 0.0
     for txn_date, ttype, amount in rows:
-        ym = txn_date.strftime("%Y-%m")
-        if ym in totals_by_month:
-            totals_by_month[ym][ttype] += float(amount)
+        for cycle, totals in zip(cycles, cycle_totals):
+            if cycle.contains(txn_date):
+                totals[ttype] += float(amount)
+                break
+        if period.contains(txn_date):
+            if ttype == TYPE_INCOME:
+                month_income += float(amount)
+            else:
+                month_expense += float(amount)
 
-    ordered = [totals_by_month[ym] for ym in sorted(totals_by_month)]
     cash_flow = {
-        "labels": labels,
-        "income": [m["income"] for m in ordered],
-        "expense": [m["expense"] for m in ordered],
+        "labels": [c.short_label for c in cycles],
+        "income": [t["income"] for t in cycle_totals],
+        "expense": [t["expense"] for t in cycle_totals],
     }
 
     # --- Category breakdown for the selected month (expenses) ---
@@ -76,8 +61,8 @@ def index():
         .filter(
             Transaction.household_id == household_id,
             Transaction.type == TYPE_EXPENSE,
-            Transaction.date >= month_start,
-            Transaction.date < month_end,
+            Transaction.date >= period_start,
+            Transaction.date < period_end,
         )
         .group_by(Category.id)
         .order_by(func.sum(Transaction.amount).desc())
@@ -86,9 +71,6 @@ def index():
     category_breakdown = [
         {"name": cat.name, "amount": float(total), "color": cat.color} for cat, total in breakdown_rows
     ]
-
-    month_income = totals_by_month[f"{year:04d}-{month:02d}"]["income"]
-    month_expense = totals_by_month[f"{year:04d}-{month:02d}"]["expense"]
 
     # --- Budget remaining per category ---
     budgeted_categories = (
@@ -105,7 +87,7 @@ def index():
     budgets = []
     for cat in budgeted_categories:
         spent = spent_lookup.get(cat.name, 0.0)
-        budget = float(cat.monthly_budget)
+        budget = float(cat.monthly_budget) * period.budget_factor
         percent = (spent / budget * 100) if budget else 0
         if percent >= 100:
             status = "critical"
@@ -130,8 +112,8 @@ def index():
         db.session.query(Transaction.user_id, Transaction.type, func.sum(Transaction.amount))
         .filter(
             Transaction.household_id == household_id,
-            Transaction.date >= month_start,
-            Transaction.date < month_end,
+            Transaction.date >= period_start,
+            Transaction.date < period_end,
         )
         .group_by(Transaction.user_id, Transaction.type)
         .all()
@@ -168,16 +150,10 @@ def index():
     top_wishlist_items.sort(key=lambda i: i.score, reverse=True)
     top_wishlist_items = top_wishlist_items[:3]
 
-    prev_month_date = month_start - relativedelta(months=1)
-    next_month_date = month_start + relativedelta(months=1)
-
     return render_template(
         "dashboard/index.html",
-        month_label=month_start.strftime("%B %Y"),
-        month_str=f"{year:04d}-{month:02d}",
-        prev_month_str=prev_month_date.strftime("%Y-%m"),
-        next_month_str=next_month_date.strftime("%Y-%m"),
-        is_current_month=(year, month) == (today.year, today.month),
+        period=period,
+        nav=period_nav(period),
         month_income=month_income,
         month_expense=month_expense,
         net_cash_flow=month_income - month_expense,

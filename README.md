@@ -43,8 +43,14 @@ created.
 
 - **Admin page** (`/admin/users`, admins only): create logins for other
   household members, deactivate accounts, reset passwords.
+- **Budget periods**: by default the Dashboard and Transactions pages report
+  on calendar months. If you're paid on, say, the 25th, set "Budget month
+  starts on day" to 25 under Admin -> Household, and both pages switch to
+  25th-to-24th periods, so the salary and the bills it pays fall in the same
+  period. The arrows step one period at a time, and the From/To boxes show
+  any custom date range.
 - **Transactions** (`/transactions`): log income/expenses, tag them, filter
-  by month/category/tag/who logged it. Each month shows a running balance -
+  by period/category/tag/who logged it. Each period shows a running balance -
   a "balance brought forward" figure (computed from your bank account and
   the ledger, or overridden manually to match a real statement at
   `/transactions/opening-balance`), a running balance per row, and a closing

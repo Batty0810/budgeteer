@@ -1,6 +1,5 @@
 from datetime import date
 
-from dateutil.relativedelta import relativedelta
 from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
 
@@ -12,6 +11,7 @@ from app.models.transaction import Transaction
 from app.models.user import User
 from app.utils.balances import get_month_running_balances
 from app.utils.charts import next_category_color
+from app.utils.periods import Period, period_containing, period_nav, resolve_period
 from app.blueprints.transactions.forms import TransactionForm, CategoryForm, OpeningBalanceForm
 
 bp = Blueprint("transactions", __name__, url_prefix="/transactions")
@@ -50,18 +50,17 @@ def _sync_tags(raw_tags):
     return tags
 
 
+def _ledger_url_for(day):
+    """The transactions list for the budget period containing `day`."""
+    period = period_containing(day, current_user.household.period_start_day)
+    return url_for("transactions.list_transactions", **period.query_args())
+
+
 @bp.route("/")
 @login_required
 def list_transactions():
-    month_str = request.args.get("month")  # "YYYY-MM"
-    if month_str:
-        year, month = (int(p) for p in month_str.split("-"))
-    else:
-        today = date.today()
-        year, month = today.year, today.month
-
-    start = date(year, month, 1)
-    end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    period = resolve_period(request.args, current_user.household.period_start_day)
+    start, end = period.start, period.end_exclusive
 
     query = Transaction.query.filter(
         Transaction.household_id == current_user.household_id,
@@ -88,7 +87,7 @@ def list_transactions():
     opening_balance, running_balances, closing_balance = get_month_running_balances(
         current_user.household, start, end
     )
-    has_override_this_month = (
+    has_override_this_period = (
         MonthlyOpeningBalance.query.filter_by(household_id=current_user.household_id, month=start).first()
         is not None
     )
@@ -99,7 +98,8 @@ def list_transactions():
         categories=_household_categories(),
         tags=Tag.query.filter_by(household_id=current_user.household_id).order_by(Tag.name).all(),
         household_users=User.query.filter_by(household_id=current_user.household_id).order_by(User.display_name).all(),
-        month_str=f"{year:04d}-{month:02d}",
+        period=period,
+        nav=period_nav(period),
         total_income=total_income,
         total_expense=total_expense,
         selected_category_id=category_id,
@@ -108,7 +108,7 @@ def list_transactions():
         opening_balance=opening_balance,
         running_balances=running_balances,
         closing_balance=closing_balance,
-        has_override_this_month=has_override_this_month,
+        has_override_this_period=has_override_this_period,
         is_filtered=bool(category_id or tag_id or user_id),
     )
 
@@ -135,7 +135,7 @@ def new_transaction():
         db.session.add(txn)
         db.session.commit()
         flash("Transaction logged.", "success")
-        return redirect(url_for("transactions.list_transactions", month=txn.date.strftime("%Y-%m")))
+        return redirect(_ledger_url_for(txn.date))
 
     return render_template("transactions/form.html", form=form, mode="new")
 
@@ -161,7 +161,7 @@ def edit_transaction(txn_id):
         txn.tags = _sync_tags(form.tags.data)
         db.session.commit()
         flash("Transaction updated.", "success")
-        return redirect(url_for("transactions.list_transactions", month=txn.date.strftime("%Y-%m")))
+        return redirect(_ledger_url_for(txn.date))
 
     return render_template("transactions/form.html", form=form, mode="edit", txn=txn)
 
@@ -172,11 +172,11 @@ def delete_transaction(txn_id):
     txn = db.session.get(Transaction, txn_id)
     if txn is None or txn.household_id != current_user.household_id:
         abort(404)
-    month_str = txn.date.strftime("%Y-%m")
+    txn_date = txn.date
     db.session.delete(txn)
     db.session.commit()
     flash("Transaction deleted.", "info")
-    return redirect(url_for("transactions.list_transactions", month=month_str))
+    return redirect(_ledger_url_for(txn_date))
 
 
 @bp.route("/categories")
@@ -240,52 +240,58 @@ def toggle_category_archive(category_id):
     return redirect(url_for("transactions.list_categories"))
 
 
+def _opening_balance_period(values):
+    """The period whose balance brought forward is being set, from
+    start/end (YYYY-MM-DD) or, for older links, month (YYYY-MM)."""
+    start_day = current_user.household.period_start_day
+    try:
+        start = date.fromisoformat(values["start"])
+    except (KeyError, ValueError):
+        return resolve_period({"month": values.get("month")}, start_day)
+    try:
+        return Period(start, date.fromisoformat(values["end"]), start_day)
+    except (KeyError, ValueError):
+        return period_containing(start, start_day)
+
+
 @bp.route("/opening-balance", methods=["GET", "POST"])
 @login_required
 def set_opening_balance():
-    month_str = request.args.get("month") or request.form.get("month")
-    if month_str:
-        year, month = (int(p) for p in month_str.split("-"))
-    else:
-        today = date.today()
-        year, month = today.year, today.month
-    month_start = date(year, month, 1)
+    period = _opening_balance_period(request.values)
 
     existing = MonthlyOpeningBalance.query.filter_by(
-        household_id=current_user.household_id, month=month_start
+        household_id=current_user.household_id, month=period.start
     ).first()
 
     form = OpeningBalanceForm(obj=existing)
     if request.method == "GET" and existing is None:
-        computed = get_month_running_balances(current_user.household, month_start, month_start + relativedelta(months=1))[0]
+        computed = get_month_running_balances(current_user.household, period.start, period.end_exclusive)[0]
         form.amount.data = computed["amount"]
 
     if form.validate_on_submit():
         if existing is None:
-            existing = MonthlyOpeningBalance(household_id=current_user.household_id, month=month_start)
+            existing = MonthlyOpeningBalance(household_id=current_user.household_id, month=period.start)
             db.session.add(existing)
         existing.amount = form.amount.data
         existing.note = form.note.data
         db.session.commit()
-        flash(f"Set the opening balance for {month_start.strftime('%B %Y')}.", "success")
-        return redirect(url_for("transactions.list_transactions", month=month_start.strftime("%Y-%m")))
+        flash(f"Set the balance brought forward for {period.start:%d %B %Y}.", "success")
+        return redirect(url_for("transactions.list_transactions", **period.query_args()))
 
     return render_template(
-        "transactions/opening_balance_form.html", form=form, month_start=month_start, existing=existing
+        "transactions/opening_balance_form.html", form=form, period=period, existing=existing
     )
 
 
 @bp.route("/opening-balance/clear", methods=["POST"])
 @login_required
 def clear_opening_balance():
-    month_str = request.form.get("month")
-    year, month = (int(p) for p in month_str.split("-"))
-    month_start = date(year, month, 1)
+    period = _opening_balance_period(request.form)
     existing = MonthlyOpeningBalance.query.filter_by(
-        household_id=current_user.household_id, month=month_start
+        household_id=current_user.household_id, month=period.start
     ).first()
     if existing:
         db.session.delete(existing)
         db.session.commit()
-        flash(f"Cleared the manual opening balance for {month_start.strftime('%B %Y')}.", "info")
-    return redirect(url_for("transactions.list_transactions", month=month_str))
+        flash(f"Cleared the manual balance brought forward for {period.start:%d %B %Y}.", "info")
+    return redirect(url_for("transactions.list_transactions", **period.query_args()))

@@ -790,3 +790,16 @@ tbody tr:hover {
   min-width: 130px;
   text-align: center;
 }
+.period-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+.period-range {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.period-range input[type="date"] {
+  width: auto;
+}

@@ -20,7 +20,9 @@ class MonthlyOpeningBalance(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     household_id = db.Column(db.Integer, db.ForeignKey("households.id"), nullable=False)
 
-    month = db.Column(db.Date, nullable=False)  # always the 1st of the month
+    # The first day of the budget period this balance applies to (the 1st of
+    # the month, or e.g. the 25th for a household paid on the 25th).
+    month = db.Column(db.Date, nullable=False)
     amount = db.Column(db.Numeric(12, 2), nullable=False)
     note = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))

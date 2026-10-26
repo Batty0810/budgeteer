@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import period_picker %}
 {% block title %}Dashboard — Budgeteer{% endblock %}
 {% block content %}
 
@@ -7,11 +8,7 @@
     <h1>Dashboard</h1>
     <p class="mb-0">{{ current_user.household.name }}'s budget overview</p>
   </div>
-  <div class="month-nav">
-    <a href="{{ url_for('dashboard.index', month=prev_month_str) }}" class="btn btn-outline btn-icon" aria-label="Previous month">&larr;</a>
-    <span class="current">{{ month_label }}</span>
-    <a href="{{ url_for('dashboard.index', month=next_month_str) }}" class="btn btn-outline btn-icon" aria-label="Next month">&rarr;</a>
-  </div>
+  {{ period_picker(period, nav) }}
 </div>
 
 <div class="grid grid-4" style="margin-bottom: 1.25rem;">
@@ -37,14 +34,14 @@
 <div class="grid grid-2" style="margin-bottom: 1.25rem;">
   <div class="card chart-card">
     <div class="card-title">
-      <span>Monthly cash flow</span>
-      <span class="badge">Last 6 months</span>
+      <span>{{ 'Monthly cash flow' if period.start_day == 1 else 'Cash flow per budget period' }}</span>
+      <span class="badge">Last 6 {{ 'months' if period.start_day == 1 else 'periods' }}</span>
     </div>
-    <canvas id="cashFlowChart" height="220" role="img" aria-label="Bar chart of income versus expenses for the last 6 months"></canvas>
+    <canvas id="cashFlowChart" height="220" role="img" aria-label="Bar chart of income versus expenses for the last 6 {{ 'months' if period.start_day == 1 else 'budget periods' }}"></canvas>
     <button class="table-view-toggle" data-target="cashFlowTable">View as table</button>
     <div class="table-view" id="cashFlowTable">
       <table>
-        <thead><tr><th>Month</th><th>Income</th><th>Expenses</th></tr></thead>
+        <thead><tr><th>{{ 'Month' if period.start_day == 1 else 'Period' }}</th><th>Income</th><th>Expenses</th></tr></thead>
         <tbody>
           {% for label in cash_flow.labels %}
           <tr>
@@ -61,7 +58,7 @@
   <div class="card chart-card">
     <div class="card-title">
       <span>Where it went</span>
-      <span class="badge">{{ month_label }}</span>
+      <span class="badge">{{ period.label }}</span>
     </div>
     {% if category_breakdown %}
     <canvas id="categoryChart" height="220" role="img" aria-label="Donut chart of spending by category"></canvas>
@@ -95,7 +92,7 @@
 <div class="card chart-card" style="margin-bottom: 1.25rem;">
   <div class="card-title">
     <span>By household member</span>
-    <span class="badge">{{ month_label }}</span>
+    <span class="badge">{{ period.label }}</span>
   </div>
   <canvas id="memberChart" height="{{ 60 + by_member|length * 40 }}" role="img" aria-label="Bar chart of income versus expenses logged by each household member"></canvas>
   <button class="table-view-toggle" data-target="memberTable">View as table</button>
@@ -124,6 +121,9 @@
       <a href="{{ url_for('transactions.list_categories') }}" class="badge">Manage budgets</a>
     </div>
     {% if budgets %}
+    {% if period.cycle_count != 1 %}
+    <p class="muted" style="margin-bottom: 1rem;">Monthly budgets {{ 'multiplied by ' ~ period.cycle_count if period.cycle_count else 'scaled to ' ~ period.days ~ ' days' }} to match the selected range.</p>
+    {% endif %}
     <div class="stack" style="gap: 1rem;">
       {% for b in budgets %}
       <div>

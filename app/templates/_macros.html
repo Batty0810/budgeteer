@@ -8,3 +8,26 @@
   {% endfor %}
 </div>
 {% endmacro %}
+
+{# Previous/next period arrows plus a From/To custom range. `nav` comes from
+   app.utils.periods.period_nav. #}
+{% macro period_picker(period, nav) %}
+<div class="period-picker">
+  <div class="month-nav">
+    <a href="{{ nav.prev_url }}" class="btn btn-outline btn-icon" aria-label="Previous period">&larr;</a>
+    <span class="current">{{ period.label }}</span>
+    <a href="{{ nav.next_url }}" class="btn btn-outline btn-icon" aria-label="Next period">&rarr;</a>
+  </div>
+  <form method="get" class="row gap-sm period-range">
+    {% for name, value in nav.hidden.items() %}
+    <input type="hidden" name="{{ name }}" value="{{ value }}">
+    {% endfor %}
+    <label class="muted" for="period-start">From</label>
+    <input type="date" id="period-start" name="start" value="{{ period.start.isoformat() }}" required>
+    <label class="muted" for="period-end">to</label>
+    <input type="date" id="period-end" name="end" value="{{ period.end.isoformat() }}" required>
+    <button type="submit" class="btn btn-outline btn-sm">Apply</button>
+    {% if not nav.is_current %}<a href="{{ nav.current_url }}" class="btn btn-outline btn-sm">This period</a>{% endif %}
+  </form>
+</div>
+{% endmacro %}

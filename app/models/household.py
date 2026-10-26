@@ -14,6 +14,9 @@ class Household(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
+    # Day of the month each budget period starts on, e.g. 25 when salaries
+    # land on the 25th - the dashboard and ledger then report 25th-to-24th.
+    period_start_day = db.Column(db.Integer, nullable=False, default=1, server_default="1")
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     users = db.relationship("User", back_populates="household", cascade="all, delete-orphan")

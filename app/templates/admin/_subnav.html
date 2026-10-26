@@ -1,4 +1,5 @@
 <div class="tab-nav">
   <a href="{{ url_for('admin.users') }}" class="{{ 'active' if request.endpoint == 'admin.users' else '' }}">Users</a>
+  <a href="{{ url_for('admin.household_settings') }}" class="{{ 'active' if request.endpoint == 'admin.household_settings' else '' }}">Household</a>
   <a href="{{ url_for('transactions.list_categories') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('transactions.') and 'categor' in request.endpoint else '' }}">Categories</a>
 </div>

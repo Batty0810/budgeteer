@@ -4,7 +4,7 @@ from flask_login import login_required, current_user
 from app.extensions import db
 from app.models.user import User
 from app.utils.decorators import admin_required
-from app.blueprints.admin.forms import NewUserForm, EditUserForm
+from app.blueprints.admin.forms import NewUserForm, EditUserForm, HouseholdSettingsForm
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -87,3 +87,18 @@ def toggle_active(user_id):
     state = "activated" if user.is_active_flag else "deactivated"
     flash(f"{user.display_name} has been {state}.", "success")
     return redirect(url_for("admin.users"))
+
+
+@bp.route("/household", methods=["GET", "POST"])
+@login_required
+@admin_required
+def household_settings():
+    household = current_user.household
+    form = HouseholdSettingsForm(obj=household)
+    if form.validate_on_submit():
+        household.name = form.name.data.strip()
+        household.period_start_day = form.period_start_day.data
+        db.session.commit()
+        flash("Household settings saved.", "success")
+        return redirect(url_for("admin.household_settings"))
+    return render_template("admin/household.html", form=form)
