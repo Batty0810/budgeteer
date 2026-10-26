@@ -6,11 +6,13 @@ from flask_login import login_required, current_user
 from app.extensions import db
 from app.models.category import Category
 from app.models.opening_balance import MonthlyOpeningBalance
+from app.models.recurring import RecurringItem
 from app.models.tag import Tag
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.utils.balances import get_month_running_balances
 from app.utils.charts import next_category_color
+from app.utils.forecasting import frequency_step
 from app.utils.periods import Period, period_containing, period_nav, resolve_period
 from app.blueprints.transactions.forms import TransactionForm, CategoryForm, OpeningBalanceForm
 
@@ -50,6 +52,27 @@ def _sync_tags(raw_tags):
     return tags
 
 
+def _make_recurring(txn, frequency):
+    """Set up a recurring item for the forecaster from a logged transaction.
+
+    The transaction itself is the first occurrence, so the recurring item
+    starts at the next one - otherwise a future-dated transaction would be
+    counted twice in the forecast.
+    """
+    item = RecurringItem(
+        household_id=txn.household_id,
+        category_id=txn.category_id,
+        name=(txn.description or txn.category.name)[:120],
+        type=txn.type,
+        amount=txn.amount,
+        frequency=frequency,
+        start_date=txn.date + frequency_step(frequency),
+    )
+    db.session.add(item)
+    txn.recurring_item = item
+    return item
+
+
 def _ledger_url_for(day):
     """The transactions list for the budget period containing `day`."""
     period = period_containing(day, current_user.household.period_start_day)
@@ -68,6 +91,12 @@ def list_transactions():
         Transaction.date < end,
     )
 
+    txn_type = request.args.get("type")
+    if txn_type not in ("income", "expense"):
+        txn_type = None
+    if txn_type:
+        query = query.filter(Transaction.type == txn_type)
+
     category_id = request.args.get("category_id", type=int)
     if category_id:
         query = query.filter(Transaction.category_id == category_id)
@@ -80,7 +109,9 @@ def list_transactions():
     if user_id:
         query = query.filter(Transaction.user_id == user_id)
 
-    transactions = query.order_by(Transaction.date.desc(), Transaction.created_at.desc()).all()
+    # Oldest first, like a bank statement, so the Balance column reads
+    # top-to-bottom from brought forward to closing.
+    transactions = query.order_by(Transaction.date.asc(), Transaction.created_at.asc(), Transaction.id.asc()).all()
     total_income = sum((t.amount for t in transactions if t.type == "income"), start=0)
     total_expense = sum((t.amount for t in transactions if t.type == "expense"), start=0)
 
@@ -102,6 +133,7 @@ def list_transactions():
         nav=period_nav(period),
         total_income=total_income,
         total_expense=total_expense,
+        selected_type=txn_type,
         selected_category_id=category_id,
         selected_tag_id=tag_id,
         selected_user_id=user_id,
@@ -109,7 +141,7 @@ def list_transactions():
         running_balances=running_balances,
         closing_balance=closing_balance,
         has_override_this_period=has_override_this_period,
-        is_filtered=bool(category_id or tag_id or user_id),
+        is_filtered=bool(txn_type or category_id or tag_id or user_id),
     )
 
 
@@ -133,8 +165,11 @@ def new_transaction():
         )
         txn.tags = _sync_tags(form.tags.data)
         db.session.add(txn)
+        if form.is_recurring.data:
+            db.session.flush()  # load txn.category for the recurring item's name
+            _make_recurring(txn, form.frequency.data)
         db.session.commit()
-        flash("Transaction logged.", "success")
+        flash("Transaction logged" + (" and added to the forecast as recurring." if form.is_recurring.data else "."), "success")
         return redirect(_ledger_url_for(txn.date))
 
     return render_template("transactions/form.html", form=form, mode="new")
@@ -159,8 +194,12 @@ def edit_transaction(txn_id):
         txn.description = form.description.data
         txn.date = form.date.data
         txn.tags = _sync_tags(form.tags.data)
+        made_recurring = form.is_recurring.data and txn.recurring_item is None
+        if made_recurring:
+            db.session.flush()
+            _make_recurring(txn, form.frequency.data)
         db.session.commit()
-        flash("Transaction updated.", "success")
+        flash("Transaction updated" + (" and added to the forecast as recurring." if made_recurring else "."), "success")
         return redirect(_ledger_url_for(txn.date))
 
     return render_template("transactions/form.html", form=form, mode="edit", txn=txn)

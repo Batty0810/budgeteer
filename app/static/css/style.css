@@ -553,6 +553,12 @@ input[type="checkbox"] {
   height: 16px;
   accent-color: var(--accent);
 }
+.field .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
 
 .form-actions {
   display: flex;
@@ -597,10 +603,25 @@ tbody tr:hover {
 .table-wrap {
   overflow-x: auto;
 }
+.nowrap {
+  white-space: nowrap;
+}
+
+/* Transactions ledger: figures right-aligned so they line up, actions on one line */
+.ledger .amount,
+.ledger th.num {
+  text-align: right;
+}
+.ledger .row-actions {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
 
 .amount {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+  white-space: nowrap;
 }
 .amount.income {
   color: var(--good);

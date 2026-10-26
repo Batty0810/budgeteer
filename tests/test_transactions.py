@@ -1,7 +1,7 @@
 from datetime import date
 
 from tests.conftest import login
-from app.models import Transaction
+from app.models import Transaction, RecurringItem
 
 
 def test_logging_a_transaction_appears_in_the_list(client, member_user, groceries_category):
@@ -58,3 +58,68 @@ def test_editing_a_transaction_with_an_archived_category_does_not_error(client, 
     )
     assert resp.status_code == 200
     assert b"Updated spend" in resp.data
+
+
+def test_transactions_list_can_be_filtered_by_income_or_expense(client, db, household, member_user, salary_category, groceries_category):
+    db.session.add(Transaction(household_id=household.id, user_id=member_user.id, category_id=salary_category.id,
+                               type="income", amount=5000, description="Pay day", date=date.today()))
+    db.session.add(Transaction(household_id=household.id, user_id=member_user.id, category_id=groceries_category.id,
+                               type="expense", amount=80, description="Bread and milk", date=date.today()))
+    db.session.commit()
+    login(client, member_user.email)
+
+    html = client.get("/transactions/?type=expense").get_data(as_text=True)
+    assert "Bread and milk" in html and "Pay day" not in html
+
+    html = client.get("/transactions/?type=income").get_data(as_text=True)
+    assert "Pay day" in html and "Bread and milk" not in html
+
+    html = client.get("/transactions/").get_data(as_text=True)
+    assert "Pay day" in html and "Bread and milk" in html
+
+
+def _log(client, category, **extra):
+    data = {"type": category.type, "category_id": category.id, "amount": "239.00",
+            "date": "2026-09-25", "description": "Microsoft 365", "tags": ""}
+    data.update(extra)
+    return client.post("/transactions/new", data=data, follow_redirects=True)
+
+
+def test_logging_a_recurring_transaction_adds_it_to_the_forecast(client, db, member_user, groceries_category):
+    login(client, member_user.email)
+    resp = _log(client, groceries_category, is_recurring="y", frequency="monthly")
+    assert b"added to the forecast as recurring" in resp.data
+
+    item = RecurringItem.query.one()
+    assert (item.name, item.type, item.amount, item.frequency) == ("Microsoft 365", "expense", 239, "monthly")
+    # The logged transaction is the first occurrence; the forecast picks up from the next one.
+    assert item.start_date == date(2026, 10, 25)
+    txn = Transaction.query.one()
+    assert txn.recurring_item_id == item.id
+
+    # Editing it shows the link rather than offering to make it recurring again.
+    html = client.get(f"/transactions/{txn.id}/edit").get_data(as_text=True)
+    assert "Repeats monthly" in html
+
+    # Removing the recurring item leaves the transaction in place, just unlinked.
+    client.post(f"/forecast/recurring/{item.id}/delete")
+    assert db.session.get(Transaction, txn.id).recurring_item_id is None
+
+
+def test_one_off_transaction_is_not_recurring(client, member_user, groceries_category):
+    login(client, member_user.email)
+    _log(client, groceries_category, frequency="monthly")
+    assert RecurringItem.query.count() == 0
+    assert Transaction.query.one().recurring_item_id is None
+
+
+def test_existing_transaction_can_be_made_recurring_once(client, db, household, member_user, salary_category):
+    login(client, member_user.email)
+    _log(client, salary_category, description="Nymbis", amount="68737.43")
+    txn = Transaction.query.one()
+    edit = {"type": "income", "category_id": salary_category.id, "amount": "68737.43",
+            "date": "2026-09-25", "description": "Nymbis", "tags": "", "is_recurring": "y", "frequency": "monthly"}
+    client.post(f"/transactions/{txn.id}/edit", data=edit)
+    client.post(f"/transactions/{txn.id}/edit", data=edit)  # saving again doesn't add a second one
+    item = RecurringItem.query.one()
+    assert (item.type, item.start_date) == ("income", date(2026, 10, 25))

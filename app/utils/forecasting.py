@@ -19,15 +19,20 @@ from app.models.recurring import (
 )
 
 
-def _recurring_occurrences(item, range_start, range_end):
-    """Yield each date `item` fires on within [range_start, range_end]."""
-    step = {
+def frequency_step(frequency):
+    """The gap between occurrences of a recurring item."""
+    return {
         FREQ_WEEKLY: relativedelta(weeks=1),
         FREQ_BIWEEKLY: relativedelta(weeks=2),
         FREQ_MONTHLY: relativedelta(months=1),
         FREQ_QUARTERLY: relativedelta(months=3),
         FREQ_ANNUAL: relativedelta(years=1),
-    }.get(item.frequency, relativedelta(months=1))
+    }.get(frequency, relativedelta(months=1))
+
+
+def _recurring_occurrences(item, range_start, range_end):
+    """Yield each date `item` fires on within [range_start, range_end]."""
+    step = frequency_step(item.frequency)
 
     cursor = item.start_date
     # Fast-forward to the first occurrence on/after range_start without

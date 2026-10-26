@@ -15,6 +15,17 @@
     {{ field(form.date) }}
     {{ field(form.description, placeholder="Optional note") }}
     {{ field(form.tags, placeholder="e.g. holiday, once-off") }}
+    {% if txn and txn.recurring_item %}
+    <p class="muted">Repeats {{ dict(form.frequency.choices)[txn.recurring_item.frequency] | lower }} &middot; <a href="{{ url_for('forecast.edit_recurring', item_id=txn.recurring_item.id) }}">manage it on the Forecaster</a></p>
+    {% else %}
+    <div class="field">
+      <label class="checkbox-label">{{ form.is_recurring() }} {{ form.is_recurring.label.text }}</label>
+      <span class="hint">Salary, rent, subscriptions and so on. The Forecaster will expect it again from the next occurrence on.</span>
+    </div>
+    <div data-show-if-checked="{{ form.is_recurring.id }}">
+      {{ field(form.frequency) }}
+    </div>
+    {% endif %}
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">{{ 'Save changes' if mode == 'edit' else 'Log it' }}</button>
       <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-outline">Cancel</a>

@@ -27,6 +27,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Show a block only while the checkbox it names is ticked.
+  document.querySelectorAll("[data-show-if-checked]").forEach((block) => {
+    const checkbox = document.getElementById(block.dataset.showIfChecked);
+    if (!checkbox) return;
+    const sync = () => { block.hidden = !checkbox.checked; };
+    checkbox.addEventListener("change", sync);
+    sync();
+  });
+
   // Toggle "view as table" disclosures next to charts.
   document.querySelectorAll(".table-view-toggle").forEach((btn) => {
     btn.addEventListener("click", () => {

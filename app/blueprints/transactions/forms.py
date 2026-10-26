@@ -1,8 +1,9 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, SelectField, DecimalField, DateField, TextAreaField
+from wtforms import StringField, SelectField, DecimalField, DateField, TextAreaField, BooleanField
 from wtforms.validators import DataRequired, Optional, NumberRange, Length
 
 from app.models.category import TYPE_INCOME, TYPE_EXPENSE
+from app.models.recurring import FREQUENCY_CHOICES, FREQ_MONTHLY
 
 
 class TransactionForm(FlaskForm):
@@ -12,6 +13,8 @@ class TransactionForm(FlaskForm):
     date = DateField("Date", validators=[DataRequired()])
     description = StringField("Description", validators=[Optional(), Length(max=255)])
     tags = StringField("Tags (comma separated)", validators=[Optional(), Length(max=255)])
+    is_recurring = BooleanField("This repeats - add it to the forecast")
+    frequency = SelectField("How often", choices=FREQUENCY_CHOICES, default=FREQ_MONTHLY)
 
 
 class CategoryForm(FlaskForm):
